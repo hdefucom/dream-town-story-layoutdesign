@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>建筑布局设计工具</title>
+    <style>
+        body { display: flex; flex-direction: row; margin: 0; font-family: sans-serif; height: 100vh; overflow: hidden; user-select: none; }
+
+        /* prevent text selection while dragging on map */
+        #mapContainer, #gridContainer, #grid, .placed { user-select: none; -webkit-user-select: none; -ms-user-select: none; }
+
+        /* palette toolbar on the left */
+        #palette { flex: 0 0 200px; border-right: 1px solid #ccc; padding: 10px; box-sizing: border-box; overflow-y: auto; position: relative; }
+        .palette-section { margin-bottom: 10px; }
+        .palette-header { background: #ddd; padding: 5px; cursor: pointer; font-weight: bold; border-radius: 3px; user-select: none; }
+        .palette-header:hover { background: #ccc; }
+        .palette-items { }
+        .palette-items.collapsed { display: none; }
+        #palette .building { margin: 5px 0; cursor: grab; border: 1px solid #999; padding: 2px; text-align: center; background: #f4f4f4; font-size: 12px; }
+
+        /* container for grid */
+        #mapContainer { flex: 1; }
+        #gridContainer { width: 100%; height: 100%; overflow: auto; position: relative; }
+        #grid { position: absolute; top: 0; left: 0; background: #e5e5e5; display: grid; transform-origin: 0 0; grid-template-columns: repeat(var(--cols), 40px); grid-template-rows: repeat(var(--rows), 40px); }
+        #grid .cell { width: 40px; height: 40px; box-sizing: border-box; border: 1px solid #ccc; }
+
+        .placed { position: absolute; box-sizing: border-box; border: 2px solid #333; background: rgba(0,0,255,0.2); }
+        .placed .label { position: absolute; font-size: 10px; color: #000; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <div id="palette"><h3>建筑列表</h3>
+        <button id="exportBtn">导出布局</button>
+        <button id="clearBtn">清空地图</button>
+        <input type="file" id="importInput" style="display:none" accept="application/json" />
+        <button id="importBtn">导入布局</button>
+    </div>
+    <div id="mapContainer">
+        <div id="gridContainer"><div id="grid"></div></div>
+    </div>
+
+    <script>
+        const cols = 200, rows = 200, cellSize = 40;
+        let buildData = [], buffData = [];
+        const placed = [];
+        let scale = 1;
+
+        function initGrid() {
+            // hook export/import buttons
+            document.getElementById('exportBtn').addEventListener('click', exportLayout);
+            document.getElementById('clearBtn').addEventListener('click', clearMap);
+            document.getElementById('importBtn').addEventListener('click', ()=>document.getElementById('importInput').click());
+            document.getElementById('importInput').addEventListener('change', onImportFile);
+            
+            const grid = document.getElementById('grid');
+            grid.style.setProperty('--cols', cols);
+            grid.style.setProperty('--rows', rows);
+            for (let i = 0; i < cols * rows; i++) {
+                const c = document.createElement('div');
+                c.className = 'cell';
+                grid.appendChild(c);
+            }
+
+            grid.addEventListener('dragover', e => e.preventDefault());
+            grid.addEventListener('drop', onDrop);
+            const container = document.getElementById('gridContainer');
+            container.addEventListener('wheel', onWheel);
+            container.addEventListener('mousedown', onContainerMouseDown);
+            
+        }
+
+        function loadData() {
+            fetch('build.json').then(r=>r.json()).then(data=>{
+                buildData = data;
+                populatePalette();
+            });
+            fetch('buff.json').then(r=>r.json()).then(data=>{
+                buffData = data;
+                // only load cache once buffer rules are available
+                loadCache();
+            });
+        }
+
+        function populatePalette() {
+            const pal = document.getElementById('palette');
+            // allow dropping here to delete buildings
+            pal.addEventListener('dragover', e=>e.preventDefault());
+            pal.addEventListener('drop', e=>{
+                e.preventDefault();
+                try{
+                    const data=JSON.parse(e.dataTransfer.getData('text/plain'));
+                    if(data.removeId!==undefined){
+                        removePlaced(data.removeId);
+                    }
+                }catch{};
+            });
+            const typeNames = { '设备': '设备', '产业1': '产业1', '产业2': '产业2' };
+            const groupedBuildings = {};
+            
+            // Group buildings by type
+            buildData.forEach(b => {
+                const type = b.type || '其他';
+                if (!groupedBuildings[type]) {
+                    groupedBuildings[type] = [];
+                }
+                groupedBuildings[type].push(b);
+            });
+            
+            // Create sections for each type
+            Object.keys(groupedBuildings).sort().forEach(type => {
+                const section = document.createElement('div');
+                section.className = 'palette-section';
+                
+                const header = document.createElement('div');
+                header.className = 'palette-header';
+                header.textContent = typeNames[type] || type + ` (${groupedBuildings[type].length})`;
+                header.dataset.type = type;
+                
+                const itemsContainer = document.createElement('div');
+                itemsContainer.className = 'palette-items';
+                
+                // Add buildings to this category
+                groupedBuildings[type].forEach(b => {
+                    const div = document.createElement('div');
+                    div.className = 'building';
+                    div.draggable = true;
+                    div.textContent = b.name + ` (${b.w}x${b.h})`;
+                    div.dataset.name = b.name;
+                    div.dataset.w = b.w;
+                    div.dataset.h = b.h;
+                    div.addEventListener('dragstart', e => {
+                        e.dataTransfer.setData('text/plain', JSON.stringify({name:b.name,w:b.w,h:b.h}));
+                    });
+                    itemsContainer.appendChild(div);
+                });
+                
+                // Toggle collapse on header click
+                header.addEventListener('click', () => {
+                    itemsContainer.classList.toggle('collapsed');
+                });
+                
+                section.appendChild(header);
+                section.appendChild(itemsContainer);
+                pal.appendChild(section);
+            });
+        }
+
+        function onDrop(e) {
+            e.preventDefault();
+            const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+            const gridRect = document.getElementById('grid').getBoundingClientRect();
+            const x = Math.floor((e.clientX - gridRect.left) / (cellSize * scale));
+            const y = Math.floor((e.clientY - gridRect.top) / (cellSize * scale));
+            placeBuilding(data.name, x, y, data.w, data.h, 0);
+        }
+
+        function placeBuilding(name, x, y, w, h, rot) {
+            // try to place at the given position
+            let finalX = x, finalY = y;
+            
+            // if position is occupied, try to find a nearby empty spot
+            if (checkOverlap(null, x, y, w, h, rot)) {
+                const [ww, hh] = rot % 180 === 0 ? [w, h] : [h, w];
+                let found = false;
+                
+                // search in expanding radius
+                for (let radius = 1; radius <= Math.max(cols, rows) && !found; radius++) {
+                    for (let dx = -radius; dx <= radius && !found; dx++) {
+                        for (let dy = -radius; dy <= radius; dy++) {
+                            if (Math.abs(dx) < radius && Math.abs(dy) < radius) continue; // only check perimeter
+                            const nx = x + dx;
+                            const ny = y + dy;
+                            if (nx >= 0 && nx + ww <= cols && ny >= 0 && ny + hh <= rows) {
+                                if (!checkOverlap(null, nx, ny, w, h, rot)) {
+                                    finalX = nx;
+                                    finalY = ny;
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // if no space found at all
+                if (!found) {
+                    alert('地图空间不足，无法放置建筑');
+                    return;
+                }
+            }
+            
+            const id = placed.length;
+            const obj = {id, name, x: finalX, y: finalY, w, h, rot, landBuff: 0, commodityBuff: 0};
+            placed.push(obj);
+            renderBuilding(obj);
+            calculateBuffers();
+            updateCache();
+        }
+
+        function renderBuilding(obj) {
+            const div = document.createElement('div');
+            div.className = 'placed';
+            div.dataset.id = obj.id;
+            div.style.left = obj.x * cellSize + 'px';
+            div.style.top = obj.y * cellSize + 'px';
+            const [ww,hh] = obj.rot%180===0 ? [obj.w,obj.h] : [obj.h,obj.w];
+            div.style.width = ww * cellSize + 'px';
+            div.style.height = hh * cellSize + 'px';
+            // right-click rotates
+            div.addEventListener('contextmenu', e=>{
+                e.preventDefault();
+                rotate(obj.id);
+            });
+            // dragging for movement
+            div.addEventListener('mousedown', e=>{
+                if(e.button!==0) return;
+                e.preventDefault(); // stop text selection while dragging
+                startDrag(obj.id, e);
+            });
+            const label = document.createElement('div');
+            label.className = 'label';
+            label.textContent = obj.name;
+            div.appendChild(label);
+            document.getElementById('grid').appendChild(div);
+        }
+
+        function rotate(id) {
+            const obj = placed[id];
+            obj.rot = (obj.rot + 90) % 360;
+            const div = document.querySelector(`.placed[data-id='${id}']`);
+            const [ww,hh] = obj.rot%180===0 ? [obj.w,obj.h] : [obj.h,obj.w];
+            div.style.width = ww * cellSize + 'px';
+            div.style.height = hh * cellSize + 'px';
+            calculateBuffers();
+            updateCache();
+        }
+
+        // dragging helpers
+        let dragging = null;
+        let bufferDebounceTimer = null;
+        function startDrag(id, e) {
+            const obj = placed[id];
+            const div = document.querySelector(`.placed[data-id='${id}']`);
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const origX = obj.x;
+            const origY = obj.y;
+            function onMouseMove(ev) {
+                const dx = ev.clientX - startX;
+                const dy = ev.clientY - startY;
+                const gx = Math.round((origX * cellSize + dx / scale) / cellSize);
+                const gy = Math.round((origY * cellSize + dy / scale) / cellSize);
+                if(!checkOverlap(id, gx, gy, obj.w, obj.h, obj.rot)){
+                    obj.x = Math.max(0, Math.min(cols-1, gx));
+                    obj.y = Math.max(0, Math.min(rows-1, gy));
+                    div.style.left = obj.x * cellSize + 'px';
+                    div.style.top = obj.y * cellSize + 'px';
+                }
+            }
+            function onMouseUp(ev) {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                // if released over palette, remove building
+                const pal = document.getElementById('palette');
+                const rect = pal.getBoundingClientRect();
+                if(ev.clientX >= rect.left && ev.clientX <= rect.right &&
+                   ev.clientY >= rect.top && ev.clientY <= rect.bottom) {
+                    removePlaced(id);
+                }
+                // finalize buffers after short delay
+                if (bufferDebounceTimer) clearTimeout(bufferDebounceTimer);
+                bufferDebounceTimer = setTimeout(() => {
+                    calculateBuffers();
+                    updateCache();
+                    bufferDebounceTimer = null;
+                }, 100);
+            }
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
+        function calculateBuffers() {
+            // reset buffs
+            placed.forEach(p=>{p.landBuff=0;p.commodityBuff=0;});
+            // check each rule
+            buffData.forEach(rule=>{
+                // find matching placed buildings by name
+                const candidates = placed.filter(p=>rule.builds.includes(p.name));
+                // try every combination of three distinct items
+                for (let i=0;i<candidates.length;i++){
+                    for (let j=i+1;j<candidates.length;j++){
+                        for (let k=j+1;k<candidates.length;k++){
+                            const group=[candidates[i],candidates[j],candidates[k]];
+                            const names=group.map(g=>g.name).sort();
+                            const ruleNames=[...rule.builds].sort();
+                            if(JSON.stringify(names)!==JSON.stringify(ruleNames)) continue;
+                            if(groupContiguous(group)){
+                                // apply buffs to group and neighbours
+                                const area = buildingsWithin(group);
+                                area.forEach(b=>{ b.landBuff+=rule.land; b.commodityBuff+=rule.commodity; });
+                            }
+                        }
+                    }
+                }
+            });
+            updateLabels();
+        }
+
+        function groupContiguous(group) {
+            // check if three buildings form a connected group
+            // (i.e., at least one building touches the other two)
+            function touches(a,b){
+                const [aw,ah] = a.rot%180===0?[a.w,a.h]:[a.h,a.w];
+                const [bw,bh] = b.rot%180===0?[b.w,b.h]:[b.h,b.w];
+                // vertical overlap + horizontal adjacency
+                const verticalOverlap = !(a.y+ah<=b.y || b.y+bh<=a.y);
+                const horizontalAdjacent = (a.x+aw===b.x) || (b.x+bw===a.x);
+                // horizontal overlap + vertical adjacency
+                const horizontalOverlap = !(a.x+aw<=b.x || b.x+bw<=a.x);
+                const verticalAdjacent = (a.y+ah===b.y) || (b.y+bh===a.y);
+                return (verticalOverlap && horizontalAdjacent) || (horizontalOverlap && verticalAdjacent);
+            }
+            // at least one building must touch the other two (forming a connected group)
+            const t01 = touches(group[0], group[1]);
+            const t02 = touches(group[0], group[2]);
+            const t12 = touches(group[1], group[2]);
+            return (t01 && t02) || (t01 && t12) || (t02 && t12);
+        }
+
+        function buildingsWithin(group) {
+            // only include buildings that touch the group (edge or vertex contact)
+            const set = new Set();
+            group.forEach(g=> set.add(g));
+            
+            function touchesAny(b) {
+                for (let g of group) {
+                    if (b === g) continue;
+                    if (isTouching(b, g)) return true;
+                }
+                return false;
+            }
+            
+            placed.forEach(b=> {
+                if (touchesAny(b)) set.add(b);
+            });
+            return Array.from(set);
+        }
+
+        function isTouching(a, b) {
+            const [aw,ah] = a.rot%180===0?[a.w,a.h]:[a.h,a.w];
+            const [bw,bh] = b.rot%180===0?[b.w,b.h]:[b.h,b.w];
+            const ax1=a.x, ay1=a.y, ax2=a.x+aw, ay2=a.y+ah;
+            const bx1=b.x, by1=b.y, bx2=b.x+bw, by2=b.y+bh;
+            
+            // calculate gap in each axis (0 means touching/overlapping)
+            const xGap = Math.max(0, Math.max(ax1 - bx2, bx1 - ax2));
+            const yGap = Math.max(0, Math.max(ay1 - by2, by1 - ay2));
+            
+            // touching/overlapping if both gaps are 0, but not completely separated
+            return xGap === 0 && yGap === 0 && !(ax2 < bx1 || bx2 < ax1 || ay2 < by1 || by2 < ay1);
+        }
+
+        function withinDistance(a,b,dist) {
+            const [aw,ah] = a.rot%180===0?[a.w,a.h]:[a.h,a.w];
+            const [bw,bh] = b.rot%180===0?[b.w,b.h]:[b.h,b.w];
+            const ax1=a.x, ay1=a.y, ax2=a.x+aw, ay2=a.y+ah;
+            const bx1=b.x-dist, by1=b.y-dist, bx2=b.x+bw+dist, by2=b.y+bh+dist;
+            return !(ax2<bx1||ax1>bx2||ay2<by1||ay1>by2);
+        }
+
+        function updateLabels() {
+            placed.forEach(p=>{
+                const div = document.querySelector(`.placed[data-id='${p.id}'] .label`);
+                div.textContent = p.name + `\n+${p.landBuff}L +${p.commodityBuff}C`;
+            });
+        }
+
+        // check overlap with existing placed (skipId for moving)
+        function checkOverlap(skipId, x, y, w, h, rot) {
+            const [ww,hh] = rot%180===0?[w,h]:[h,w];
+            for(const b of placed){
+                if(b.id===skipId) continue;
+                const [bw,bh] = b.rot%180===0?[b.w,b.h]:[b.h,b.w];
+                if(!(x+ww<=b.x || b.x+bw<=x || y+hh<=b.y || b.y+bh<=y)){
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function onWheel(e){
+            e.preventDefault();
+            const delta = -e.deltaY;
+            scale += delta * 0.001;
+            scale = Math.min(Math.max(0.2, scale), 3);
+            document.getElementById('grid').style.transform = `scale(${scale})`;
+        }
+
+        // drag empty cells to pan the map
+        function onContainerMouseDown(e) {
+            // only allow panning if clicking on an empty cell or the grid background
+            if (e.target.closest('.placed')) return; // don't pan if clicking on a building
+            if (e.button !== 0) return; // only left-click
+            
+            e.preventDefault();
+            const container = document.getElementById('gridContainer');
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startScrollLeft = container.scrollLeft;
+            const startScrollTop = container.scrollTop;
+
+            function onMouseMove(ev) {
+                const dx = ev.clientX - startX;
+                const dy = ev.clientY - startY;
+                container.scrollLeft = startScrollLeft - dx;
+                container.scrollTop = startScrollTop - dy;
+            }
+
+            function onMouseUp(ev) {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            }
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
+        // localStorage cache functions
+        function updateCache(){
+            try{
+                const data = placed.map(p=>({name:p.name,x:p.x,y:p.y,w:p.w,h:p.h,rot:p.rot}));
+                localStorage.setItem('layoutCache', JSON.stringify(data));
+            }catch(e){console.warn('cache failed',e);}        }
+        function removePlaced(id){
+            const idx = placed.findIndex(p=>p.id===id);
+            if(idx!==-1){
+                placed.splice(idx,1);
+                const el=document.querySelector(`.placed[data-id='${id}']`);
+                if(el) el.remove();
+                calculateBuffers();
+                updateCache();
+            }
+        }
+        function loadCache(){
+            const raw = localStorage.getItem('layoutCache');
+            if(raw){
+                try{
+                    const arr=JSON.parse(raw);
+                    arr.forEach(item=>{
+                        placeBuilding(item.name,item.x,item.y,item.w,item.h,item.rot);
+                    });
+                    calculateBuffers();
+                }catch(e){console.warn('load cache error',e);}            }
+        }
+        function exportLayout(){
+            const data = placed.map(p=>({name:p.name,x:p.x,y:p.y,w:p.w,h:p.h,rot:p.rot}));
+            const blob=new Blob([JSON.stringify(data, null, 2)],{type:'application/json'});
+            const url=URL.createObjectURL(blob);
+            const a=document.createElement('a');
+            a.href=url; a.download='layout.json'; a.click();
+            URL.revokeObjectURL(url);
+        }
+        function onImportFile(e){
+            const file=e.target.files[0];
+            if(!file) return;
+            const reader=new FileReader();
+            reader.onload = ()=>{
+                try{
+                    const arr=JSON.parse(reader.result);
+                    // clear existing
+                    placed.splice(0,placed.length);
+                    document.querySelectorAll('.placed').forEach(d=>d.remove());
+                    arr.forEach(item=>placeBuilding(item.name,item.x,item.y,item.w,item.h,item.rot));
+                    calculateBuffers();
+                    updateCache();
+                }catch(err){alert('导入失败');}
+            };
+            reader.readAsText(file);
+        }
+
+        // completely wipe the map and cache
+        function clearMap(){
+            if(!confirm('确定要清空地图吗？此操作不可撤销。')) return;
+            placed.splice(0, placed.length);
+            document.querySelectorAll('.placed').forEach(d=>d.remove());
+            localStorage.removeItem('layoutCache');
+        }
+        window.onload = ()=>{ initGrid(); loadData(); };
+    </script>
+</body>
+</html>
