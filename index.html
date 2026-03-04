@@ -18,6 +18,8 @@
         .palette-items { }
         .palette-items.collapsed { display: none; }
         #palette .building { margin: 5px 0; cursor: grab; border: 1px solid #999; padding: 2px; text-align: center; background: #f4f4f4; font-size: 12px; }
+        #palette .layout-item { margin: 5px 0; cursor: pointer; border: 1px solid #666; padding: 5px; text-align: center; background: #e8f4f8; font-size: 12px; border-radius: 3px; }
+        #palette .layout-item:hover { background: #d0e8f0; }
 
         /* container for grid */
         #mapContainer { flex: 1; }
@@ -30,7 +32,12 @@
     </style>
 </head>
 <body>
-    <div id="palette"><h3>建筑列表</h3>
+    <div id="palette">
+        <div class="palette-section">
+            <div class="palette-header" data-type="layouts">内置布局</div>
+            <div class="palette-items" id="layoutsList"></div>
+        </div>
+        <h3>建筑列表</h3>
         <button id="exportBtn">导出布局</button>
         <button id="clearBtn">清空地图</button>
         <input type="file" id="importInput" style="display:none" accept="application/json" />
@@ -42,7 +49,7 @@
 
     <script>
         const cols = 200, rows = 200, cellSize = 40;
-        let buildData = [], buffData = [];
+        let buildData = [], buffData = [], layoutsData = [];
         const placed = [];
         let scale = 1;
 
@@ -79,6 +86,44 @@
                 buffData = data;
                 // only load cache once buffer rules are available
                 loadCache();
+            });
+            fetch('layouts.json').then(r=>r.json()).then(data=>{
+                layoutsData = data;
+                populateLayouts();
+            });
+        }
+
+        function populateLayouts() {
+            const header = document.querySelector('.palette-header[data-type="layouts"]');
+            const listContainer = document.getElementById('layoutsList');
+            
+            // Toggle collapse on header click
+            header.addEventListener('click', () => {
+                listContainer.classList.toggle('collapsed');
+            });
+            
+            // Populate layout items
+            layoutsData.forEach(layout => {
+                const div = document.createElement('div');
+                div.className = 'layout-item';
+                div.textContent = layout.name;
+                div.addEventListener('click', () => {
+                    loadLayoutFile(layout.file);
+                });
+                listContainer.appendChild(div);
+            });
+        }
+
+        function loadLayoutFile(filePath) {
+            fetch(filePath).then(r=>r.json()).then(arr=>{
+                // clear existing
+                placed.splice(0, placed.length);
+                document.querySelectorAll('.placed').forEach(d=>d.remove());
+                arr.forEach(item=>placeBuilding(item.name,item.x,item.y,item.w,item.h,item.rot));
+                calculateBuffers();
+                updateCache();
+            }).catch(err=>{
+                alert('加载布局失败: ' + err.message);
             });
         }
 
