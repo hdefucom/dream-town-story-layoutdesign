@@ -161,6 +161,7 @@
                 <div class="manual-section-title">框选与批量操作</div>
                 <ul class="manual-list">
                     <li>在地图空白处左键拖拽可框选多个建筑。</li>
+                    <li>按住 Ctrl（Windows）/ Command（macOS）点击或框选，可在当前选择基础上追加多选。</li>
                     <li>拖动已选中的任意一个建筑，可整体批量移动。</li>
                     <li>多选后按 Backspace / Delete 可批量删除。</li>
                 </ul>
@@ -202,6 +203,11 @@
         let panShiftPressed = false;
         let panAnimationId = null;
         let panLastTime = 0;
+        const isMacPlatform = /mac/i.test(navigator.platform || '');
+
+        function isAdditiveSelectModifier(event) {
+            return isMacPlatform ? event.metaKey : event.ctrlKey;
+        }
 
         function initGrid() {
             // hook export/import buttons
@@ -594,6 +600,7 @@
         let dragging = null;
         let bufferDebounceTimer = null;
         function startDrag(id, e) {
+            const appendSelection = isAdditiveSelectModifier(e);
             const movingIds = selectedBuildingIds.has(id) && selectedBuildingIds.size > 1
                 ? Array.from(selectedBuildingIds)
                 : [id];
@@ -649,7 +656,13 @@
                 document.removeEventListener('mousemove', onMouseMove);
                 document.removeEventListener('mouseup', onMouseUp);
                 if (!moved) {
-                    selectBuilding(id);
+                    if (appendSelection) {
+                        const nextSelection = new Set(selectedBuildingIds);
+                        nextSelection.add(id);
+                        setSelection(Array.from(nextSelection), id);
+                    } else {
+                        selectBuilding(id);
+                    }
                     logBuildingBuffs(id);
                     return;
                 }
@@ -676,6 +689,7 @@
         function onContainerMouseDown(e) {
             if (e.button !== 0) return;
             if (e.target.closest('.placed')) return;
+            const appendSelection = isAdditiveSelectModifier(e);
 
             const selectionBox = document.getElementById('selectionBox');
             const startX = e.clientX;
@@ -711,7 +725,9 @@
                 selectionBox.style.display = 'none';
 
                 if (isClick) {
-                    clearSelectedBuilding();
+                    if (!appendSelection) {
+                        clearSelectedBuilding();
+                    }
                     return;
                 }
 
@@ -724,7 +740,12 @@
                     }
                 });
 
-                setSelection(selectedIds);
+                if (appendSelection) {
+                    const mergedIds = Array.from(new Set([...selectedBuildingIds, ...selectedIds]));
+                    setSelection(mergedIds);
+                } else {
+                    setSelection(selectedIds);
+                }
             }
 
             document.addEventListener('mousemove', onMouseMove);
