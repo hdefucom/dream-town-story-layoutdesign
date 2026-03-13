@@ -21,10 +21,36 @@
         #palette .layout-item:hover { background: #d0e8f0; }
 
         /* container for grid */
-        #mapContainer { flex: 1; min-width: 0; }
+        #mapContainer { flex: 1; min-width: 0; position: relative; }
         #gridContainer { width: 100%; height: 100%; overflow: auto; position: relative; }
         #grid { position: absolute; top: 0; left: 0; background: #e5e5e5; display: grid; transform-origin: 0 0; grid-template-columns: repeat(var(--cols), 40px); grid-template-rows: repeat(var(--rows), 40px); }
         #grid .cell { width: 40px; height: 40px; box-sizing: border-box; border: 1px solid #ccc; }
+
+        #crosshairLayer {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 30;
+            display: none;
+        }
+        .crosshair-line {
+            position: absolute;
+            background: rgba(46, 125, 50, 0.8);
+        }
+        #crosshairX { left: 0; right: 0; height: 1px; }
+        #crosshairY { top: 0; bottom: 0; width: 1px; }
+        #coordHud {
+            position: absolute;
+            left: 10px;
+            bottom: 10px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.65);
+            color: #fff;
+            font-size: 12px;
+            letter-spacing: 0.2px;
+            white-space: nowrap;
+        }
 
         .placed { position: absolute; box-sizing: border-box; border: 2px solid #333; background: rgba(0,0,255,0.2); }
         .placed.selected { border-color: #c62828; box-shadow: 0 0 0 2px rgba(198, 40, 40, 0.2); }
@@ -97,6 +123,11 @@
     </div>
     <div id="mapContainer">
         <div id="gridContainer"><div id="grid"></div></div>
+        <div id="crosshairLayer">
+            <div id="crosshairX" class="crosshair-line"></div>
+            <div id="crosshairY" class="crosshair-line"></div>
+            <div id="coordHud">X: 0, Y: 0</div>
+        </div>
     </div>
     <aside id="detailsPanel">
         <h3>建筑 Buff 明细</h3>
@@ -165,6 +196,8 @@
         const keyboardPanStep = 120;
         let viewportCacheTimer = null;
         let manualVisible = false;
+        let hoverClientX = null;
+        let hoverClientY = null;
 
         function initGrid() {
             // hook export/import buttons
@@ -187,6 +220,8 @@
             const container = document.getElementById('gridContainer');
             container.addEventListener('wheel', onWheel, { passive: false });
             container.addEventListener('scroll', onViewportScroll, { passive: true });
+            container.addEventListener('mousemove', onContainerMouseMove);
+            container.addEventListener('mouseleave', onContainerMouseLeave);
             container.addEventListener('mousedown', onContainerMouseDown);
             // Safari on macOS exposes pinch as gesture events.
             container.addEventListener('gesturestart', onGestureStart);
@@ -867,6 +902,7 @@
             container.scrollLeft = worldX * scale - offsetX;
             container.scrollTop = worldY * scale - offsetY;
             scheduleViewportCacheUpdate();
+            updateCrosshair();
         }
 
         function onWheel(e){
@@ -890,6 +926,60 @@
 
         function onViewportScroll() {
             scheduleViewportCacheUpdate();
+            updateCrosshair();
+        }
+
+        function onContainerMouseMove(e) {
+            hoverClientX = e.clientX;
+            hoverClientY = e.clientY;
+            updateCrosshair();
+        }
+
+        function onContainerMouseLeave() {
+            hoverClientX = null;
+            hoverClientY = null;
+            hideCrosshair();
+        }
+
+        function hideCrosshair() {
+            const layer = document.getElementById('crosshairLayer');
+            layer.style.display = 'none';
+        }
+
+        function updateCrosshair() {
+            if (hoverClientX === null || hoverClientY === null) {
+                hideCrosshair();
+                return;
+            }
+
+            const container = document.getElementById('gridContainer');
+            const rect = container.getBoundingClientRect();
+            const offsetX = hoverClientX - rect.left;
+            const offsetY = hoverClientY - rect.top;
+            if (offsetX < 0 || offsetY < 0 || offsetX > rect.width || offsetY > rect.height) {
+                hideCrosshair();
+                return;
+            }
+
+            const worldX = (container.scrollLeft + offsetX) / scale;
+            const worldY = (container.scrollTop + offsetY) / scale;
+            const lineXIndex = Math.max(0, Math.min(cols, Math.round(worldX / cellSize)));
+            const lineYIndex = Math.max(0, Math.min(rows, Math.round(worldY / cellSize)));
+            const cellX = Math.max(0, Math.min(cols - 1, Math.floor(worldX / cellSize)));
+            const cellY = Math.max(0, Math.min(rows - 1, Math.floor(worldY / cellSize)));
+
+            const screenLineX = lineXIndex * cellSize * scale - container.scrollLeft;
+            const screenLineY = lineYIndex * cellSize * scale - container.scrollTop;
+
+            const layer = document.getElementById('crosshairLayer');
+            const crossX = document.getElementById('crosshairX');
+            const crossY = document.getElementById('crosshairY');
+            const hud = document.getElementById('coordHud');
+
+            layer.style.display = 'block';
+            crossX.style.top = `${screenLineY}px`;
+            crossY.style.left = `${screenLineX}px`;
+            hud.textContent = `X: ${cellX}, Y: ${cellY}`;
         }
 
         function scheduleViewportCacheUpdate() {
