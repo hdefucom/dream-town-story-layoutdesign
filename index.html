@@ -15,20 +15,31 @@
         .palette-section { margin-bottom: 10px; }
         .palette-header { background: #ddd; padding: 5px; cursor: pointer; font-weight: bold; border-radius: 3px; user-select: none; }
         .palette-header:hover { background: #ccc; }
-        .palette-items { }
         .palette-items.collapsed { display: none; }
         #palette .building { margin: 5px 0; cursor: grab; border: 1px solid #999; padding: 2px; text-align: center; background: #f4f4f4; font-size: 12px; }
         #palette .layout-item { margin: 5px 0; cursor: pointer; border: 1px solid #666; padding: 5px; text-align: center; background: #e8f4f8; font-size: 12px; border-radius: 3px; }
         #palette .layout-item:hover { background: #d0e8f0; }
 
         /* container for grid */
-        #mapContainer { flex: 1; }
+        #mapContainer { flex: 1; min-width: 0; }
         #gridContainer { width: 100%; height: 100%; overflow: auto; position: relative; }
         #grid { position: absolute; top: 0; left: 0; background: #e5e5e5; display: grid; transform-origin: 0 0; grid-template-columns: repeat(var(--cols), 40px); grid-template-rows: repeat(var(--rows), 40px); }
         #grid .cell { width: 40px; height: 40px; box-sizing: border-box; border: 1px solid #ccc; }
 
         .placed { position: absolute; box-sizing: border-box; border: 2px solid #333; background: rgba(0,0,255,0.2); }
+        .placed.selected { border-color: #c62828; box-shadow: 0 0 0 2px rgba(198, 40, 40, 0.2); }
         .placed .label { position: absolute; font-size: 10px; color: #000; pointer-events: none; }
+
+        #detailsPanel { flex: 0 0 280px; border-left: 1px solid #ccc; padding: 12px; box-sizing: border-box; overflow-y: auto; background: #fafafa; }
+        #detailsPanel h3 { margin: 0 0 12px; font-size: 16px; }
+        .details-empty { color: #666; font-size: 13px; line-height: 1.5; }
+        .details-card { border: 1px solid #ddd; border-radius: 6px; background: #fff; padding: 10px; margin-bottom: 12px; }
+        .details-card-title { font-size: 15px; font-weight: bold; margin-bottom: 8px; }
+        .details-meta { font-size: 12px; color: #444; line-height: 1.6; }
+        .buff-list { display: flex; flex-direction: column; gap: 8px; }
+        .buff-item { border: 1px solid #ddd; border-radius: 6px; background: #fff; padding: 10px; }
+        .buff-item-title { font-size: 13px; font-weight: bold; margin-bottom: 6px; }
+        .buff-item-line { font-size: 12px; color: #444; line-height: 1.5; }
     </style>
 </head>
 <body>
@@ -46,12 +57,18 @@
     <div id="mapContainer">
         <div id="gridContainer"><div id="grid"></div></div>
     </div>
+    <aside id="detailsPanel">
+        <h3>建筑 Buff 明细</h3>
+        <div id="detailsContent" class="details-empty">点击地图中的建筑后，这里会显示该建筑当前生效的 buff 明细。</div>
+    </aside>
 
     <script>
         const cols = 200, rows = 200, cellSize = 40;
         let buildData = [], buffData = [], layoutsData = [];
         const placed = [];
         let scale = 1;
+        let selectedBuildingId = null;
+        let nextPlacedId = 0;
 
         function initGrid() {
             // hook export/import buttons
@@ -118,7 +135,9 @@
             fetch(filePath).then(r=>r.json()).then(arr=>{
                 // clear existing
                 placed.splice(0, placed.length);
+                nextPlacedId = 0;
                 document.querySelectorAll('.placed').forEach(d=>d.remove());
+                clearSelectedBuilding();
                 arr.forEach(item=>placeBuilding(item.name,item.x,item.y,item.w,item.h,item.rot));
                 calculateBuffers();
                 updateCache();
@@ -235,12 +254,73 @@
                 }
             }
             
-            const id = placed.length;
-            const obj = {id, name, x: finalX, y: finalY, w, h, rot, landBuff: 0, commodityBuff: 0};
+            const id = nextPlacedId++;
+            const obj = {id, name, x: finalX, y: finalY, w, h, rot, landBuff: 0, commodityBuff: 0, activeBuffs: []};
             placed.push(obj);
             renderBuilding(obj);
             calculateBuffers();
             updateCache();
+        }
+
+        function getPlacedById(id) {
+            return placed.find(item => item.id === id);
+        }
+
+        function getSelectedBuilding() {
+            if (selectedBuildingId === null) return null;
+            return getPlacedById(selectedBuildingId);
+        }
+
+        function updateSelectedBuildingStyles() {
+            document.querySelectorAll('.placed').forEach(element => {
+                element.classList.toggle('selected', Number(element.dataset.id) === selectedBuildingId);
+            });
+        }
+
+        function renderBuildingDetails(building) {
+            const detailsContent = document.getElementById('detailsContent');
+            if (!building) {
+                detailsContent.className = 'details-empty';
+                detailsContent.innerHTML = '点击地图中的建筑后，这里会显示该建筑当前生效的 buff 明细。';
+                updateSelectedBuildingStyles();
+                return;
+            }
+
+            const buffsHtml = building.activeBuffs.length
+                ? `<div class="buff-list">${building.activeBuffs.map((buff, index) => `
+                    <div class="buff-item">
+                        <div class="buff-item-title">Buff ${index + 1}</div>
+                        <div class="buff-item-line">组合：${buff.builds.join(' + ')}</div>
+                        <div class="buff-item-line">来源建筑：${buff.source.join(' + ')}</div>
+                        <div class="buff-item-line">地价加成：+${buff.land}</div>
+                        <div class="buff-item-line">商品加成：+${buff.commodity}</div>
+                    </div>
+                `).join('')}</div>`
+                : '<div class="details-empty">当前没有生效的 buff。</div>';
+
+            detailsContent.className = '';
+            detailsContent.innerHTML = `
+                <div class="details-card">
+                    <div class="details-card-title">${building.name}</div>
+                    <div class="details-meta">坐标：(${building.x}, ${building.y})</div>
+                    <div class="details-meta">尺寸：${building.w} x ${building.h}</div>
+                    <div class="details-meta">旋转：${building.rot}°</div>
+                    <div class="details-meta">总地价加成：+${building.landBuff}</div>
+                    <div class="details-meta">总商品加成：+${building.commodityBuff}</div>
+                </div>
+                ${buffsHtml}
+            `;
+            updateSelectedBuildingStyles();
+        }
+
+        function selectBuilding(id) {
+            selectedBuildingId = id;
+            renderBuildingDetails(getPlacedById(id));
+        }
+
+        function clearSelectedBuilding() {
+            selectedBuildingId = null;
+            renderBuildingDetails(null);
         }
 
         function renderBuilding(obj) {
@@ -271,7 +351,8 @@
         }
 
         function rotate(id) {
-            const obj = placed[id];
+            const obj = getPlacedById(id);
+            if (!obj) return;
             obj.rot = (obj.rot + 90) % 360;
             const div = document.querySelector(`.placed[data-id='${id}']`);
             const [ww,hh] = obj.rot%180===0 ? [obj.w,obj.h] : [obj.h,obj.w];
@@ -285,15 +366,20 @@
         let dragging = null;
         let bufferDebounceTimer = null;
         function startDrag(id, e) {
-            const obj = placed[id];
+            const obj = getPlacedById(id);
+            if (!obj) return;
             const div = document.querySelector(`.placed[data-id='${id}']`);
             const startX = e.clientX;
             const startY = e.clientY;
             const origX = obj.x;
             const origY = obj.y;
+            let moved = false;
             function onMouseMove(ev) {
                 const dx = ev.clientX - startX;
                 const dy = ev.clientY - startY;
+                if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+                    moved = true;
+                }
                 const gx = Math.round((origX * cellSize + dx / scale) / cellSize);
                 const gy = Math.round((origY * cellSize + dy / scale) / cellSize);
                 if(!checkOverlap(id, gx, gy, obj.w, obj.h, obj.rot)){
@@ -306,6 +392,11 @@
             function onMouseUp(ev) {
                 document.removeEventListener('mousemove', onMouseMove);
                 document.removeEventListener('mouseup', onMouseUp);
+                if (!moved) {
+                    selectBuilding(id);
+                    logBuildingBuffs(id);
+                    return;
+                }
                 // if released over palette, remove building
                 const pal = document.getElementById('palette');
                 const rect = pal.getBoundingClientRect();
@@ -327,7 +418,11 @@
 
         function calculateBuffers() {
             // reset buffs
-            placed.forEach(p=>{p.landBuff=0;p.commodityBuff=0;});
+            placed.forEach(p=>{
+                p.landBuff = 0;
+                p.commodityBuff = 0;
+                p.activeBuffs = [];
+            });
             // check each rule
             buffData.forEach(rule=>{
                 // find matching placed buildings by name
@@ -343,13 +438,51 @@
                             if(groupContiguous(group)){
                                 // apply buffs to group and neighbours
                                 const area = buildingsWithin(group);
-                                area.forEach(b=>{ b.landBuff+=rule.land; b.commodityBuff+=rule.commodity; });
+                                area.forEach(b=>{
+                                    b.landBuff += rule.land;
+                                    b.commodityBuff += rule.commodity;
+                                    b.activeBuffs.push({
+                                        builds: [...rule.builds],
+                                        land: rule.land,
+                                        commodity: rule.commodity,
+                                        source: group.map(item => item.name)
+                                    });
+                                });
                             }
                         }
                     }
                 }
             });
             updateLabels();
+            renderBuildingDetails(getSelectedBuilding());
+        }
+
+        function logBuildingBuffs(id) {
+            const building = getPlacedById(id);
+            if (!building) return;
+            const title = `[建筑 Buff] ${building.name} (${building.x}, ${building.y})`;
+            console.group(title);
+            console.log('建筑信息', {
+                name: building.name,
+                position: { x: building.x, y: building.y },
+                size: { w: building.w, h: building.h },
+                rotation: building.rot,
+                totalLandBuff: building.landBuff,
+                totalCommodityBuff: building.commodityBuff
+            });
+            if (!building.activeBuffs.length) {
+                console.log('当前没有生效的 buff');
+                console.groupEnd();
+                return;
+            }
+            console.table(building.activeBuffs.map((buff, index) => ({
+                index: index + 1,
+                组合: buff.builds.join(' + '),
+                来源建筑: buff.source.join(' + '),
+                地价加成: buff.land,
+                商品加成: buff.commodity
+            })));
+            console.groupEnd();
         }
 
         function groupContiguous(group) {
@@ -483,6 +616,9 @@
                 placed.splice(idx,1);
                 const el=document.querySelector(`.placed[data-id='${id}']`);
                 if(el) el.remove();
+                if (selectedBuildingId === id) {
+                    clearSelectedBuilding();
+                }
                 calculateBuffers();
                 updateCache();
             }
@@ -492,6 +628,8 @@
             if(raw){
                 try{
                     const arr=JSON.parse(raw);
+                    nextPlacedId = 0;
+                    clearSelectedBuilding();
                     arr.forEach(item=>{
                         placeBuilding(item.name,item.x,item.y,item.w,item.h,item.rot);
                     });
@@ -515,7 +653,9 @@
                     const arr=JSON.parse(reader.result);
                     // clear existing
                     placed.splice(0,placed.length);
+                    nextPlacedId = 0;
                     document.querySelectorAll('.placed').forEach(d=>d.remove());
+                    clearSelectedBuilding();
                     arr.forEach(item=>placeBuilding(item.name,item.x,item.y,item.w,item.h,item.rot));
                     calculateBuffers();
                     updateCache();
@@ -528,8 +668,10 @@
         function clearMap(){
             if(!confirm('确定要清空地图吗？此操作不可撤销。')) return;
             placed.splice(0, placed.length);
+            nextPlacedId = 0;
             document.querySelectorAll('.placed').forEach(d=>d.remove());
             localStorage.removeItem('layoutCache');
+            clearSelectedBuilding();
         }
         window.onload = ()=>{ initGrid(); loadData(); };
     </script>
