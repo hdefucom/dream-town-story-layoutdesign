@@ -204,9 +204,19 @@
         let panAnimationId = null;
         let panLastTime = 0;
         const isMacPlatform = /mac/i.test(navigator.platform || '');
+        const cacheBustToken = String(Date.now());
 
         function isAdditiveSelectModifier(event) {
             return isMacPlatform ? event.metaKey : event.ctrlKey;
+        }
+
+        function withCacheBust(url) {
+            const separator = url.includes('?') ? '&' : '?';
+            return `${url}${separator}v=${cacheBustToken}`;
+        }
+
+        function fetchJsonNoCache(url) {
+            return fetch(withCacheBust(url), { cache: 'no-store' }).then(r => r.json());
         }
 
         function initGrid() {
@@ -245,17 +255,17 @@
         }
 
         function loadData() {
-            fetch('build.json').then(r=>r.json()).then(data=>{
+            fetchJsonNoCache('build.json').then(data=>{
                 buildData = data;
                 populatePalette();
                 renderBuildingDetails(getSelectedBuilding());
             });
-            fetch('buff.json').then(r=>r.json()).then(data=>{
+            fetchJsonNoCache('buff.json').then(data=>{
                 buffData = data;
                 // only load cache once buffer rules are available
                 loadCache();
             });
-            fetch('layouts.json').then(r=>r.json()).then(data=>{
+            fetchJsonNoCache('layouts.json').then(data=>{
                 layoutsData = data;
                 populateLayouts();
             });
@@ -283,7 +293,7 @@
         }
 
         function loadLayoutFile(filePath) {
-            fetch(filePath).then(r=>r.json()).then(arr=>{
+            fetchJsonNoCache(filePath).then(arr=>{
                 loadPlacedItems(arr);
             }).catch(err=>{
                 alert('加载布局失败: ' + err.message);
