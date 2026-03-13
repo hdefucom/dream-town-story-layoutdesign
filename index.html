@@ -193,11 +193,15 @@
         let highlightedBuffSourceIds = [];
         let nextPlacedId = 0;
         const bulkRenderBatchSize = 200;
-        const keyboardPanStep = 120;
+        const keyboardPanSpeed = 850;
         let viewportCacheTimer = null;
         let manualVisible = false;
         let hoverClientX = null;
         let hoverClientY = null;
+        const panPressedKeys = new Set();
+        let panShiftPressed = false;
+        let panAnimationId = null;
+        let panLastTime = 0;
 
         function initGrid() {
             // hook export/import buttons
@@ -227,6 +231,8 @@
             container.addEventListener('gesturestart', onGestureStart);
             container.addEventListener('gesturechange', onGestureChange);
             window.addEventListener('keydown', onKeyPan);
+            window.addEventListener('keyup', onKeyPanStop);
+            window.addEventListener('blur', resetKeyPanState);
             loadViewportCache();
             showManual();
             
@@ -1053,24 +1059,86 @@
             }
 
             const key = e.key.toLowerCase();
-            let dx = 0;
-            let dy = 0;
-            const step = e.shiftKey ? keyboardPanStep * 2 : keyboardPanStep;
+            if (key === 'shift') {
+                panShiftPressed = true;
+                return;
+            }
 
-            if (key === 'a') dx = -step;
-            if (key === 'd') dx = step;
-            if (key === 'w') dy = -step;
-            if (key === 's') dy = step;
-
-            if (dx === 0 && dy === 0) {
+            if (!['w', 'a', 's', 'd'].includes(key)) {
                 return;
             }
 
             e.preventDefault();
+            panPressedKeys.add(key);
+            startKeyPanLoop();
+        }
+
+        function onKeyPanStop(e) {
+            const key = e.key.toLowerCase();
+            if (key === 'shift') {
+                panShiftPressed = false;
+                return;
+            }
+            if (!['w', 'a', 's', 'd'].includes(key)) {
+                return;
+            }
+            panPressedKeys.delete(key);
+            if (!panPressedKeys.size) {
+                stopKeyPanLoop();
+            }
+        }
+
+        function startKeyPanLoop() {
+            if (panAnimationId !== null) return;
+            panLastTime = 0;
+            panAnimationId = requestAnimationFrame(runKeyPanLoop);
+        }
+
+        function stopKeyPanLoop() {
+            if (panAnimationId !== null) {
+                cancelAnimationFrame(panAnimationId);
+                panAnimationId = null;
+            }
+            panLastTime = 0;
+        }
+
+        function resetKeyPanState() {
+            panPressedKeys.clear();
+            panShiftPressed = false;
+            stopKeyPanLoop();
+        }
+
+        function runKeyPanLoop(timestamp) {
+            if (!panPressedKeys.size || manualVisible) {
+                stopKeyPanLoop();
+                return;
+            }
+
+            if (!panLastTime) {
+                panLastTime = timestamp;
+            }
+            const dt = Math.min((timestamp - panLastTime) / 1000, 0.05);
+            panLastTime = timestamp;
+
+            let vx = 0;
+            let vy = 0;
+            if (panPressedKeys.has('a')) vx -= 1;
+            if (panPressedKeys.has('d')) vx += 1;
+            if (panPressedKeys.has('w')) vy -= 1;
+            if (panPressedKeys.has('s')) vy += 1;
+
+            const length = Math.hypot(vx, vy) || 1;
+            vx /= length;
+            vy /= length;
+
+            const speed = panShiftPressed ? keyboardPanSpeed * 2 : keyboardPanSpeed;
             const container = document.getElementById('gridContainer');
-            container.scrollLeft += dx;
-            container.scrollTop += dy;
+            container.scrollLeft += vx * speed * dt;
+            container.scrollTop += vy * speed * dt;
             scheduleViewportCacheUpdate();
+            updateCrosshair();
+
+            panAnimationId = requestAnimationFrame(runKeyPanLoop);
         }
 
         function showManual() {
