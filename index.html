@@ -69,6 +69,7 @@
         let scale = 1;
         let selectedBuildingId = null;
         let nextPlacedId = 0;
+        const bulkRenderBatchSize = 200;
 
         function initGrid() {
             // hook export/import buttons
@@ -133,17 +134,45 @@
 
         function loadLayoutFile(filePath) {
             fetch(filePath).then(r=>r.json()).then(arr=>{
-                // clear existing
-                placed.splice(0, placed.length);
-                nextPlacedId = 0;
-                document.querySelectorAll('.placed').forEach(d=>d.remove());
-                clearSelectedBuilding();
-                arr.forEach(item=>placeBuilding(item.name,item.x,item.y,item.w,item.h,item.rot));
-                calculateBuffers();
-                updateCache();
+                loadPlacedItems(arr);
             }).catch(err=>{
                 alert('加载布局失败: ' + err.message);
             });
+        }
+
+        function resetPlacedBuildings() {
+            placed.splice(0, placed.length);
+            nextPlacedId = 0;
+            document.querySelectorAll('.placed').forEach(element => element.remove());
+            clearSelectedBuilding();
+        }
+
+        function nextFrame() {
+            return new Promise(resolve => requestAnimationFrame(resolve));
+        }
+
+        async function loadPlacedItems(items) {
+            resetPlacedBuildings();
+            const grid = document.getElementById('grid');
+
+            for (let index = 0; index < items.length; index += bulkRenderBatchSize) {
+                const fragment = document.createDocumentFragment();
+                const chunk = items.slice(index, index + bulkRenderBatchSize);
+                chunk.forEach(item => {
+                    placeBuilding(item.name, item.x, item.y, item.w, item.h, item.rot, {
+                        skipRefresh: true,
+                        resolveOccupied: false,
+                        renderTarget: fragment
+                    });
+                });
+                grid.appendChild(fragment);
+                if (index + bulkRenderBatchSize < items.length) {
+                    await nextFrame();
+                }
+            }
+
+            calculateBuffers();
+            updateCache();
         }
 
         function populatePalette() {
@@ -219,12 +248,13 @@
             placeBuilding(data.name, x, y, data.w, data.h, 0);
         }
 
-        function placeBuilding(name, x, y, w, h, rot) {
+        function placeBuilding(name, x, y, w, h, rot, options = {}) {
+            const { skipRefresh = false, resolveOccupied = true, renderTarget = null } = options;
             // try to place at the given position
             let finalX = x, finalY = y;
             
             // if position is occupied, try to find a nearby empty spot
-            if (checkOverlap(null, x, y, w, h, rot)) {
+            if (resolveOccupied && checkOverlap(null, x, y, w, h, rot)) {
                 const [ww, hh] = rot % 180 === 0 ? [w, h] : [h, w];
                 let found = false;
                 
@@ -257,9 +287,11 @@
             const id = nextPlacedId++;
             const obj = {id, name, x: finalX, y: finalY, w, h, rot, landBuff: 0, commodityBuff: 0, activeBuffs: []};
             placed.push(obj);
-            renderBuilding(obj);
-            calculateBuffers();
-            updateCache();
+            renderBuilding(obj, renderTarget);
+            if (!skipRefresh) {
+                calculateBuffers();
+                updateCache();
+            }
         }
 
         function getPlacedById(id) {
@@ -323,7 +355,7 @@
             renderBuildingDetails(null);
         }
 
-        function renderBuilding(obj) {
+        function renderBuilding(obj, renderTarget = null) {
             const div = document.createElement('div');
             div.className = 'placed';
             div.dataset.id = obj.id;
@@ -347,7 +379,7 @@
             label.className = 'label';
             label.textContent = obj.name;
             div.appendChild(label);
-            document.getElementById('grid').appendChild(div);
+            (renderTarget || document.getElementById('grid')).appendChild(div);
         }
 
         function rotate(id) {
@@ -628,12 +660,7 @@
             if(raw){
                 try{
                     const arr=JSON.parse(raw);
-                    nextPlacedId = 0;
-                    clearSelectedBuilding();
-                    arr.forEach(item=>{
-                        placeBuilding(item.name,item.x,item.y,item.w,item.h,item.rot);
-                    });
-                    calculateBuffers();
+                    loadPlacedItems(arr);
                 }catch(e){console.warn('load cache error',e);}            }
         }
         function exportLayout(){
@@ -651,14 +678,7 @@
             reader.onload = ()=>{
                 try{
                     const arr=JSON.parse(reader.result);
-                    // clear existing
-                    placed.splice(0,placed.length);
-                    nextPlacedId = 0;
-                    document.querySelectorAll('.placed').forEach(d=>d.remove());
-                    clearSelectedBuilding();
-                    arr.forEach(item=>placeBuilding(item.name,item.x,item.y,item.w,item.h,item.rot));
-                    calculateBuffers();
-                    updateCache();
+                    loadPlacedItems(arr);
                 }catch(err){alert('导入失败');}
             };
             reader.readAsText(file);
@@ -667,11 +687,8 @@
         // completely wipe the map and cache
         function clearMap(){
             if(!confirm('确定要清空地图吗？此操作不可撤销。')) return;
-            placed.splice(0, placed.length);
-            nextPlacedId = 0;
-            document.querySelectorAll('.placed').forEach(d=>d.remove());
+            resetPlacedBuildings();
             localStorage.removeItem('layoutCache');
-            clearSelectedBuilding();
         }
         window.onload = ()=>{ initGrid(); loadData(); };
     </script>
