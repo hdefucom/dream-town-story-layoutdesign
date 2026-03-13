@@ -28,8 +28,18 @@
 
         .placed { position: absolute; box-sizing: border-box; border: 2px solid #333; background: rgba(0,0,255,0.2); }
         .placed.selected { border-color: #c62828; box-shadow: 0 0 0 2px rgba(198, 40, 40, 0.2); }
+        .placed.group-selected { border-color: #ef6c00; box-shadow: 0 0 0 2px rgba(239, 108, 0, 0.2); }
         .placed.buff-source { background: rgba(46, 125, 50, 0.45); }
         .placed .label { position: absolute; font-size: 10px; color: #000; pointer-events: none; }
+
+        #selectionBox {
+            position: fixed;
+            border: 1px dashed #1565c0;
+            background: rgba(21, 101, 192, 0.15);
+            pointer-events: none;
+            z-index: 9999;
+            display: none;
+        }
 
         #detailsPanel { flex: 0 0 280px; border-left: 1px solid #ccc; padding: 12px; box-sizing: border-box; overflow-y: auto; background: #fafafa; }
         #detailsPanel h3 { margin: 0 0 12px; font-size: 16px; }
@@ -64,6 +74,7 @@
         <h3>建筑 Buff 明细</h3>
         <div id="detailsContent" class="details-empty">点击地图中的建筑后，这里会显示该建筑当前生效的 buff 明细。</div>
     </aside>
+    <div id="selectionBox"></div>
 
     <script>
         const cols = 200, rows = 200, cellSize = 40;
@@ -71,10 +82,13 @@
         const placed = [];
         let scale = 1;
         let selectedBuildingId = null;
+        let selectedBuildingIds = new Set();
         let selectedBuffIndex = null;
         let highlightedBuffSourceIds = [];
         let nextPlacedId = 0;
         const bulkRenderBatchSize = 200;
+        const keyboardPanStep = 120;
+        let viewportCacheTimer = null;
 
         function initGrid() {
             // hook export/import buttons
@@ -95,8 +109,14 @@
             grid.addEventListener('dragover', e => e.preventDefault());
             grid.addEventListener('drop', onDrop);
             const container = document.getElementById('gridContainer');
-            container.addEventListener('wheel', onWheel);
+            container.addEventListener('wheel', onWheel, { passive: false });
+            container.addEventListener('scroll', onViewportScroll, { passive: true });
             container.addEventListener('mousedown', onContainerMouseDown);
+            // Safari on macOS exposes pinch as gesture events.
+            container.addEventListener('gesturestart', onGestureStart);
+            container.addEventListener('gesturechange', onGestureChange);
+            window.addEventListener('keydown', onKeyPan);
+            loadViewportCache();
             
         }
 
@@ -312,8 +332,22 @@
             document.querySelectorAll('.placed').forEach(element => {
                 const id = Number(element.dataset.id);
                 element.classList.toggle('selected', id === selectedBuildingId);
+                element.classList.toggle('group-selected', selectedBuildingIds.has(id) && id !== selectedBuildingId);
                 element.classList.toggle('buff-source', highlightedBuffSourceIds.includes(id));
             });
+        }
+
+        function setSelection(ids, primaryId = null) {
+            selectedBuildingIds = new Set(ids);
+            if (!selectedBuildingIds.size) {
+                selectedBuildingId = null;
+            } else if (primaryId !== null && selectedBuildingIds.has(primaryId)) {
+                selectedBuildingId = primaryId;
+            } else {
+                selectedBuildingId = ids[0];
+            }
+            clearBuffHighlight();
+            renderBuildingDetails(getSelectedBuilding());
         }
 
         function clearBuffHighlight() {
@@ -373,15 +407,11 @@
         }
 
         function selectBuilding(id) {
-            selectedBuildingId = id;
-            clearBuffHighlight();
-            renderBuildingDetails(getPlacedById(id));
+            setSelection([id], id);
         }
 
         function clearSelectedBuilding() {
-            selectedBuildingId = null;
-            clearBuffHighlight();
-            renderBuildingDetails(null);
+            setSelection([]);
         }
 
         function renderBuilding(obj, renderTarget = null) {
@@ -427,13 +457,17 @@
         let dragging = null;
         let bufferDebounceTimer = null;
         function startDrag(id, e) {
-            const obj = getPlacedById(id);
-            if (!obj) return;
-            const div = document.querySelector(`.placed[data-id='${id}']`);
+            const movingIds = selectedBuildingIds.has(id) && selectedBuildingIds.size > 1
+                ? Array.from(selectedBuildingIds)
+                : [id];
+            const movingIdSet = new Set(movingIds);
+            const movingBuildings = movingIds.map(movingId => getPlacedById(movingId)).filter(Boolean);
+            const anchor = getPlacedById(id);
+            if (!anchor || !movingBuildings.length) return;
+            const movingOriginalPos = new Map(movingBuildings.map(building => [building.id, { x: building.x, y: building.y }]));
+
             const startX = e.clientX;
             const startY = e.clientY;
-            const origX = obj.x;
-            const origY = obj.y;
             let moved = false;
             function onMouseMove(ev) {
                 const dx = ev.clientX - startX;
@@ -441,13 +475,37 @@
                 if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
                     moved = true;
                 }
-                const gx = Math.round((origX * cellSize + dx / scale) / cellSize);
-                const gy = Math.round((origY * cellSize + dy / scale) / cellSize);
-                if(!checkOverlap(id, gx, gy, obj.w, obj.h, obj.rot)){
-                    obj.x = Math.max(0, Math.min(cols-1, gx));
-                    obj.y = Math.max(0, Math.min(rows-1, gy));
-                    div.style.left = obj.x * cellSize + 'px';
-                    div.style.top = obj.y * cellSize + 'px';
+
+                const gridDx = Math.round(dx / (cellSize * scale));
+                const gridDy = Math.round(dy / (cellSize * scale));
+                const nextPositions = new Map();
+                let canMove = true;
+
+                for (const building of movingBuildings) {
+                    const original = movingOriginalPos.get(building.id);
+                    const nextX = original.x + gridDx;
+                    const nextY = original.y + gridDy;
+                    const [ww, hh] = building.rot % 180 === 0 ? [building.w, building.h] : [building.h, building.w];
+                    if (nextX < 0 || nextY < 0 || nextX + ww > cols || nextY + hh > rows) {
+                        canMove = false;
+                        break;
+                    }
+                    if (checkOverlapAgainstStatic(movingIdSet, building.id, nextX, nextY, building.w, building.h, building.rot)) {
+                        canMove = false;
+                        break;
+                    }
+                    nextPositions.set(building.id, { x: nextX, y: nextY });
+                }
+
+                if (canMove) {
+                    for (const building of movingBuildings) {
+                        const nextPos = nextPositions.get(building.id);
+                        building.x = nextPos.x;
+                        building.y = nextPos.y;
+                        const buildingDiv = document.querySelector(`.placed[data-id='${building.id}']`);
+                        buildingDiv.style.left = building.x * cellSize + 'px';
+                        buildingDiv.style.top = building.y * cellSize + 'px';
+                    }
                 }
             }
             function onMouseUp(ev) {
@@ -463,7 +521,8 @@
                 const rect = pal.getBoundingClientRect();
                 if(ev.clientX >= rect.left && ev.clientX <= rect.right &&
                    ev.clientY >= rect.top && ev.clientY <= rect.bottom) {
-                    removePlaced(id);
+                    removePlacedMany(movingIds);
+                    return;
                 }
                 // finalize buffers after short delay
                 if (bufferDebounceTimer) clearTimeout(bufferDebounceTimer);
@@ -473,6 +532,64 @@
                     bufferDebounceTimer = null;
                 }, 100);
             }
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
+        function onContainerMouseDown(e) {
+            if (e.button !== 0) return;
+            if (e.target.closest('.placed')) return;
+
+            const selectionBox = document.getElementById('selectionBox');
+            const startX = e.clientX;
+            const startY = e.clientY;
+
+            selectionBox.style.display = 'block';
+            selectionBox.style.left = `${startX}px`;
+            selectionBox.style.top = `${startY}px`;
+            selectionBox.style.width = '0px';
+            selectionBox.style.height = '0px';
+
+            function onMouseMove(ev) {
+                const x = Math.min(startX, ev.clientX);
+                const y = Math.min(startY, ev.clientY);
+                const w = Math.abs(ev.clientX - startX);
+                const h = Math.abs(ev.clientY - startY);
+                selectionBox.style.left = `${x}px`;
+                selectionBox.style.top = `${y}px`;
+                selectionBox.style.width = `${w}px`;
+                selectionBox.style.height = `${h}px`;
+            }
+
+            function onMouseUp(ev) {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+
+                const x1 = Math.min(startX, ev.clientX);
+                const y1 = Math.min(startY, ev.clientY);
+                const x2 = Math.max(startX, ev.clientX);
+                const y2 = Math.max(startY, ev.clientY);
+                const isClick = Math.abs(ev.clientX - startX) < 4 && Math.abs(ev.clientY - startY) < 4;
+
+                selectionBox.style.display = 'none';
+
+                if (isClick) {
+                    clearSelectedBuilding();
+                    return;
+                }
+
+                const selectedIds = [];
+                document.querySelectorAll('.placed').forEach(element => {
+                    const rect = element.getBoundingClientRect();
+                    const overlap = !(rect.right < x1 || rect.left > x2 || rect.bottom < y1 || rect.top > y2);
+                    if (overlap) {
+                        selectedIds.push(Number(element.dataset.id));
+                    }
+                });
+
+                setSelection(selectedIds);
+            }
+
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mouseup', onMouseUp);
         }
@@ -646,41 +763,138 @@
             return false;
         }
 
-        function onWheel(e){
-            e.preventDefault();
-            const delta = -e.deltaY;
-            scale += delta * 0.001;
-            scale = Math.min(Math.max(0.2, scale), 3);
-            document.getElementById('grid').style.transform = `scale(${scale})`;
+        function checkOverlapAgainstStatic(movingIdSet, skipId, x, y, w, h, rot) {
+            const [ww,hh] = rot%180===0 ? [w,h] : [h,w];
+            for (const b of placed) {
+                if (b.id === skipId) continue;
+                if (movingIdSet.has(b.id)) continue;
+                const [bw,bh] = b.rot%180===0 ? [b.w,b.h] : [b.h,b.w];
+                if (!(x + ww <= b.x || b.x + bw <= x || y + hh <= b.y || b.y + bh <= y)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
-        // drag empty cells to pan the map
-        function onContainerMouseDown(e) {
-            // only allow panning if clicking on an empty cell or the grid background
-            if (e.target.closest('.placed')) return; // don't pan if clicking on a building
-            if (e.button !== 0) return; // only left-click
-            
+        function applyScaleAtPoint(nextScale, clientX, clientY) {
+            const container = document.getElementById('gridContainer');
+            const rect = container.getBoundingClientRect();
+            const offsetX = clientX - rect.left;
+            const offsetY = clientY - rect.top;
+            const worldX = (container.scrollLeft + offsetX) / scale;
+            const worldY = (container.scrollTop + offsetY) / scale;
+
+            scale = Math.min(Math.max(0.2, nextScale), 3);
+            document.getElementById('grid').style.transform = `scale(${scale})`;
+
+            container.scrollLeft = worldX * scale - offsetX;
+            container.scrollTop = worldY * scale - offsetY;
+            scheduleViewportCacheUpdate();
+        }
+
+        function onWheel(e){
+            // Keep native horizontal/vertical scrolling unless user is intentionally zooming.
+            if (!(e.ctrlKey || e.metaKey)) {
+                return;
+            }
+            e.preventDefault();
+            const zoomFactor = Math.exp(-e.deltaY * 0.002);
+            applyScaleAtPoint(scale * zoomFactor, e.clientX, e.clientY);
+        }
+
+        function onGestureStart(e) {
+            e.preventDefault();
+        }
+
+        function onGestureChange(e) {
+            e.preventDefault();
+            applyScaleAtPoint(scale * e.scale, e.clientX, e.clientY);
+        }
+
+        function onViewportScroll() {
+            scheduleViewportCacheUpdate();
+        }
+
+        function scheduleViewportCacheUpdate() {
+            if (viewportCacheTimer) {
+                clearTimeout(viewportCacheTimer);
+            }
+            viewportCacheTimer = setTimeout(() => {
+                updateViewportCache();
+                viewportCacheTimer = null;
+            }, 80);
+        }
+
+        function updateViewportCache() {
+            try {
+                const container = document.getElementById('gridContainer');
+                const viewport = {
+                    scale,
+                    scrollLeft: container.scrollLeft,
+                    scrollTop: container.scrollTop
+                };
+                localStorage.setItem('viewportCache', JSON.stringify(viewport));
+            } catch (e) {
+                console.warn('viewport cache failed', e);
+            }
+        }
+
+        function loadViewportCache() {
+            const raw = localStorage.getItem('viewportCache');
+            if (!raw) return;
+            try {
+                const viewport = JSON.parse(raw);
+                const container = document.getElementById('gridContainer');
+                const nextScale = Number(viewport.scale);
+                if (!Number.isNaN(nextScale)) {
+                    scale = Math.min(Math.max(0.2, nextScale), 3);
+                    document.getElementById('grid').style.transform = `scale(${scale})`;
+                }
+                requestAnimationFrame(() => {
+                    container.scrollLeft = Number(viewport.scrollLeft) || 0;
+                    container.scrollTop = Number(viewport.scrollTop) || 0;
+                });
+            } catch (e) {
+                console.warn('load viewport cache error', e);
+            }
+        }
+
+        function onKeyPan(e) {
+            const tagName = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '';
+            if (tagName === 'input' || tagName === 'textarea' || e.target.isContentEditable) {
+                return;
+            }
+
+            if (e.key === 'Backspace' || e.key === 'Delete') {
+                if (selectedBuildingIds.size > 1) {
+                    e.preventDefault();
+                    removePlacedMany(Array.from(selectedBuildingIds));
+                } else if (selectedBuildingId !== null) {
+                    e.preventDefault();
+                    removePlaced(selectedBuildingId);
+                }
+                return;
+            }
+
+            const key = e.key.toLowerCase();
+            let dx = 0;
+            let dy = 0;
+            const step = e.shiftKey ? keyboardPanStep * 2 : keyboardPanStep;
+
+            if (key === 'a') dx = -step;
+            if (key === 'd') dx = step;
+            if (key === 'w') dy = -step;
+            if (key === 's') dy = step;
+
+            if (dx === 0 && dy === 0) {
+                return;
+            }
+
             e.preventDefault();
             const container = document.getElementById('gridContainer');
-            const startX = e.clientX;
-            const startY = e.clientY;
-            const startScrollLeft = container.scrollLeft;
-            const startScrollTop = container.scrollTop;
-
-            function onMouseMove(ev) {
-                const dx = ev.clientX - startX;
-                const dy = ev.clientY - startY;
-                container.scrollLeft = startScrollLeft - dx;
-                container.scrollTop = startScrollTop - dy;
-            }
-
-            function onMouseUp(ev) {
-                document.removeEventListener('mousemove', onMouseMove);
-                document.removeEventListener('mouseup', onMouseUp);
-            }
-
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
+            container.scrollLeft += dx;
+            container.scrollTop += dy;
+            scheduleViewportCacheUpdate();
         }
 
         // localStorage cache functions
@@ -688,6 +902,7 @@
             try{
                 const data = placed.map(p=>({name:p.name,x:p.x,y:p.y,w:p.w,h:p.h,rot:p.rot}));
                 localStorage.setItem('layoutCache', JSON.stringify(data));
+                updateViewportCache();
             }catch(e){console.warn('cache failed',e);}        }
         function removePlaced(id){
             const idx = placed.findIndex(p=>p.id===id);
@@ -695,12 +910,42 @@
                 placed.splice(idx,1);
                 const el=document.querySelector(`.placed[data-id='${id}']`);
                 if(el) el.remove();
+                selectedBuildingIds.delete(id);
                 if (selectedBuildingId === id) {
-                    clearSelectedBuilding();
+                    const remaining = Array.from(selectedBuildingIds);
+                    if (remaining.length) {
+                        setSelection(remaining);
+                    } else {
+                        clearSelectedBuilding();
+                    }
                 }
                 calculateBuffers();
                 updateCache();
             }
+        }
+
+        function removePlacedMany(ids) {
+            const removeSet = new Set(ids);
+            if (!removeSet.size) return;
+
+            for (let i = placed.length - 1; i >= 0; i--) {
+                if (removeSet.has(placed[i].id)) {
+                    const removeId = placed[i].id;
+                    placed.splice(i, 1);
+                    const el = document.querySelector(`.placed[data-id='${removeId}']`);
+                    if (el) el.remove();
+                }
+            }
+
+            const remainingSelection = Array.from(selectedBuildingIds).filter(id => !removeSet.has(id));
+            if (remainingSelection.length) {
+                setSelection(remainingSelection);
+            } else {
+                clearSelectedBuilding();
+            }
+
+            calculateBuffers();
+            updateCache();
         }
         function loadCache(){
             const raw = localStorage.getItem('layoutCache');
