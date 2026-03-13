@@ -342,7 +342,7 @@
             const buffsHtml = building.activeBuffs.length
                 ? `<div class="buff-list">${building.activeBuffs.map((buff, index) => `
                     <div class="buff-item ${selectedBuffIndex === index ? 'active' : ''}" data-buff-index="${index}">
-                        <div class="buff-item-title">${buff.name || `Buff ${index + 1}`}</div>
+                        <div class="buff-item-title">${index + 1}. ${buff.name || `Buff ${index + 1}`}</div>
                         <div class="buff-item-line">组合：${buff.builds.join(' + ')}</div>
                         <div class="buff-item-line">来源建筑：${buff.source.join(' + ')}</div>
                         <div class="buff-item-line">地价加成：+${buff.land}</div>
@@ -358,6 +358,7 @@
                     <div class="details-meta">坐标：(${building.x}, ${building.y})</div>
                     <div class="details-meta">尺寸：${building.w} x ${building.h}</div>
                     <div class="details-meta">旋转：${building.rot}°</div>
+                    <div class="details-meta">Buff 数量：${building.activeBuffs.length}</div>
                     <div class="details-meta">总地价加成：+${building.landBuff}</div>
                     <div class="details-meta">总商品加成：+${building.commodityBuff}</div>
                 </div>
