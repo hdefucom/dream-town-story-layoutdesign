@@ -242,6 +242,7 @@
             fetch('build.json').then(r=>r.json()).then(data=>{
                 buildData = data;
                 populatePalette();
+                renderBuildingDetails(getSelectedBuilding());
             });
             fetch('buff.json').then(r=>r.json()).then(data=>{
                 buffData = data;
@@ -491,6 +492,23 @@
                 return;
             }
 
+            const normalizeName = (value) => String(value || '').normalize('NFKC').trim();
+            const buildingSource = buildData.find(item => normalizeName(item.name) === normalizeName(building.name));
+            const sourceLand = Number(buildingSource?.land);
+            const sourceCommodity = Number(buildingSource?.commodity);
+            const hasLand = Number.isFinite(sourceLand);
+            const hasCommodity = Number.isFinite(sourceCommodity);
+            const landValue = hasLand ? (sourceLand * building.landBuff / 100) : null;
+            const commodityValue = hasCommodity ? (sourceCommodity * building.commodityBuff / 100) : null;
+            const formatComputedValue = (value) => {
+                const rounded = Math.round(value * 100) / 100;
+                return Number.isInteger(rounded) ? `${rounded}` : rounded.toFixed(2);
+            };
+            const extraValueLines = [
+                hasLand ? `<div class="details-meta">地价：${formatComputedValue(landValue)}</div>` : '',
+                hasCommodity ? `<div class="details-meta">商品：${formatComputedValue(commodityValue)}</div>` : ''
+            ].join('');
+
             const buffsHtml = building.activeBuffs.length
                 ? `<div class="buff-list">${building.activeBuffs.map((buff, index) => `
                     <div class="buff-item ${selectedBuffIndex === index ? 'active' : ''}" data-buff-index="${index}">
@@ -513,6 +531,7 @@
                     <div class="details-meta">Buff 数量：${building.activeBuffs.length}</div>
                     <div class="details-meta">总地价加成：+${building.landBuff}</div>
                     <div class="details-meta">总商品加成：+${building.commodityBuff}</div>
+                    ${extraValueLines}
                 </div>
                 ${buffsHtml}
             `;
