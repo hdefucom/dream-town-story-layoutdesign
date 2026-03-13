@@ -28,6 +28,7 @@
 
         .placed { position: absolute; box-sizing: border-box; border: 2px solid #333; background: rgba(0,0,255,0.2); }
         .placed.selected { border-color: #c62828; box-shadow: 0 0 0 2px rgba(198, 40, 40, 0.2); }
+        .placed.buff-source { background: rgba(46, 125, 50, 0.45); }
         .placed .label { position: absolute; font-size: 10px; color: #000; pointer-events: none; }
 
         #detailsPanel { flex: 0 0 280px; border-left: 1px solid #ccc; padding: 12px; box-sizing: border-box; overflow-y: auto; background: #fafafa; }
@@ -37,7 +38,9 @@
         .details-card-title { font-size: 15px; font-weight: bold; margin-bottom: 8px; }
         .details-meta { font-size: 12px; color: #444; line-height: 1.6; }
         .buff-list { display: flex; flex-direction: column; gap: 8px; }
-        .buff-item { border: 1px solid #ddd; border-radius: 6px; background: #fff; padding: 10px; }
+        .buff-item { border: 1px solid #ddd; border-radius: 6px; background: #fff; padding: 10px; cursor: pointer; }
+        .buff-item:hover { border-color: #bbb; background: #f5f5f5; }
+        .buff-item.active { border-color: #2e7d32; background: #edf7ee; }
         .buff-item-title { font-size: 13px; font-weight: bold; margin-bottom: 6px; }
         .buff-item-line { font-size: 12px; color: #444; line-height: 1.5; }
     </style>
@@ -68,6 +71,8 @@
         const placed = [];
         let scale = 1;
         let selectedBuildingId = null;
+        let selectedBuffIndex = null;
+        let highlightedBuffSourceIds = [];
         let nextPlacedId = 0;
         const bulkRenderBatchSize = 200;
 
@@ -305,8 +310,24 @@
 
         function updateSelectedBuildingStyles() {
             document.querySelectorAll('.placed').forEach(element => {
-                element.classList.toggle('selected', Number(element.dataset.id) === selectedBuildingId);
+                const id = Number(element.dataset.id);
+                element.classList.toggle('selected', id === selectedBuildingId);
+                element.classList.toggle('buff-source', highlightedBuffSourceIds.includes(id));
             });
+        }
+
+        function clearBuffHighlight() {
+            selectedBuffIndex = null;
+            highlightedBuffSourceIds = [];
+            updateSelectedBuildingStyles();
+        }
+
+        function highlightBuffSources(buffIndex) {
+            const building = getSelectedBuilding();
+            if (!building || !building.activeBuffs[buffIndex]) return;
+            selectedBuffIndex = buffIndex;
+            highlightedBuffSourceIds = [...building.activeBuffs[buffIndex].sourceIds];
+            renderBuildingDetails(building);
         }
 
         function renderBuildingDetails(building) {
@@ -320,8 +341,8 @@
 
             const buffsHtml = building.activeBuffs.length
                 ? `<div class="buff-list">${building.activeBuffs.map((buff, index) => `
-                    <div class="buff-item">
-                        <div class="buff-item-title">Buff ${index + 1}</div>
+                    <div class="buff-item ${selectedBuffIndex === index ? 'active' : ''}" data-buff-index="${index}">
+                        <div class="buff-item-title">${buff.name || `Buff ${index + 1}`}</div>
                         <div class="buff-item-line">组合：${buff.builds.join(' + ')}</div>
                         <div class="buff-item-line">来源建筑：${buff.source.join(' + ')}</div>
                         <div class="buff-item-line">地价加成：+${buff.land}</div>
@@ -342,16 +363,23 @@
                 </div>
                 ${buffsHtml}
             `;
+            detailsContent.querySelectorAll('.buff-item').forEach(element => {
+                element.addEventListener('click', () => {
+                    highlightBuffSources(Number(element.dataset.buffIndex));
+                });
+            });
             updateSelectedBuildingStyles();
         }
 
         function selectBuilding(id) {
             selectedBuildingId = id;
+            clearBuffHighlight();
             renderBuildingDetails(getPlacedById(id));
         }
 
         function clearSelectedBuilding() {
             selectedBuildingId = null;
+            clearBuffHighlight();
             renderBuildingDetails(null);
         }
 
@@ -449,14 +477,17 @@
         }
 
         function calculateBuffers() {
+            const appliedBuffKeys = new Map();
             // reset buffs
             placed.forEach(p=>{
                 p.landBuff = 0;
                 p.commodityBuff = 0;
                 p.activeBuffs = [];
+                appliedBuffKeys.set(p.id, new Set());
             });
             // check each rule
             buffData.forEach(rule=>{
+                const ruleKey = `${rule.name || ''}|${[...rule.builds].sort().join('|')}|${rule.land}|${rule.commodity}`;
                 // find matching placed buildings by name
                 const candidates = placed.filter(p=>rule.builds.includes(p.name));
                 // try every combination of three distinct items
@@ -471,13 +502,20 @@
                                 // apply buffs to group and neighbours
                                 const area = buildingsWithin(group);
                                 area.forEach(b=>{
+                                    const buildingAppliedBuffKeys = appliedBuffKeys.get(b.id);
+                                    if (buildingAppliedBuffKeys.has(ruleKey)) {
+                                        return;
+                                    }
+                                    buildingAppliedBuffKeys.add(ruleKey);
                                     b.landBuff += rule.land;
                                     b.commodityBuff += rule.commodity;
                                     b.activeBuffs.push({
+                                        name: rule.name,
                                         builds: [...rule.builds],
                                         land: rule.land,
                                         commodity: rule.commodity,
-                                        source: group.map(item => item.name)
+                                        source: group.map(item => item.name),
+                                        sourceIds: group.map(item => item.id)
                                     });
                                 });
                             }
@@ -486,6 +524,14 @@
                 }
             });
             updateLabels();
+            if (selectedBuffIndex !== null) {
+                const selectedBuilding = getSelectedBuilding();
+                if (selectedBuilding && selectedBuilding.activeBuffs[selectedBuffIndex]) {
+                    highlightedBuffSourceIds = [...selectedBuilding.activeBuffs[selectedBuffIndex].sourceIds];
+                } else {
+                    clearBuffHighlight();
+                }
+            }
             renderBuildingDetails(getSelectedBuilding());
         }
 
