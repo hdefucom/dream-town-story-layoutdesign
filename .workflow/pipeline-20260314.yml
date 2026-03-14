@@ -7,4 +7,29 @@ triggers:
     branches:
       prefix:
         - ''
-stages: []
+stages:
+  - name: stage-3a52afb9
+    displayName: 未命名
+    strategy: naturally
+    trigger: auto
+    executor: []
+    steps:
+      - step: deploy@agent
+        name: deploy_agent
+        displayName: 主机部署
+        hostGroupID:
+          ID: aliyun
+          hostID:
+            - 3df99a14-cda0-42b1-969e-29479b3ad4f7
+        deployArtifact:
+          - source: artifact
+            name: output
+            target: ~/gitee_go/deploy
+            artifactRepository: default
+            artifactName: output
+            artifactVersion: latest
+        script:
+          - /www/deploy.sh
+        notify: []
+        strategy:
+          retry: '0'
