@@ -1430,7 +1430,10 @@
             if (e.button !== 0) return;
             if (e.target.closest('.placed')) return;
             const appendSelection = isAdditiveSelectModifier(e);
-            startSelectionDrag(e.clientX, e.clientY, appendSelection);
+            const pointerConfig = (typeof e.pointerId === 'number')
+                ? { pointerId: e.pointerId }
+                : null;
+            startSelectionDrag(e.clientX, e.clientY, appendSelection, pointerConfig);
         }
 
         function onContainerPointerMove(e) {
@@ -1444,7 +1447,7 @@
         }
 
         function onContainerPointerDown(e) {
-            if (pendingPlacement && !e.target.closest('.placed')) {
+            if (shouldUseTapPlacement() && pendingPlacement && !e.target.closest('.placed')) {
                 return;
             }
             if (e.pointerType !== 'mouse') {
@@ -1489,8 +1492,8 @@
                 e.preventDefault();
                 return;
             }
-            // Touch tap on empty area clears selection (unless multi-select mode keeps it).
-            if (!isAdditiveSelectModifier(e)) {
+            // 仅移动端/触屏模式下，点空白清空选择；PC 避免干扰拖拽框选结果。
+            if (shouldUseTapPlacement() && !isAdditiveSelectModifier(e)) {
                 clearSelectedBuilding();
             }
         }
