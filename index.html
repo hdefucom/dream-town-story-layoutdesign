@@ -314,6 +314,66 @@
             letter-spacing: 0.2px;
             white-space: nowrap;
         }
+        #pathHud {
+            position: absolute;
+            left: 10px;
+            bottom: 38px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: rgba(160, 24, 24, 0.78);
+            color: #fff;
+            font-size: 12px;
+            letter-spacing: 0.2px;
+            white-space: nowrap;
+            z-index: 35;
+            display: none;
+            pointer-events: none;
+        }
+        #shortestPathLayer {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 6;
+        }
+        .shortest-path-cell {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border: 2px solid rgba(245, 0, 0, 0.98);
+            background: rgba(255, 24, 24, 0.32);
+            box-shadow: inset 0 0 0 1px rgba(255, 186, 186, 0.35);
+        }
+        .shortest-path-cell.start,
+        .shortest-path-cell.end {
+            border-color: rgba(120, 0, 0, 1);
+            background: rgba(128, 0, 0, 0.62);
+            box-shadow: inset 0 0 0 1px rgba(255, 220, 220, 0.45), 0 0 0 1px rgba(92, 0, 0, 0.35);
+        }
+        .shortest-path-arrow {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 0;
+            height: 0;
+            border-top: 7px solid transparent;
+            border-bottom: 7px solid transparent;
+            border-left: 12px solid rgba(255, 255, 255, 0.95);
+            transform-origin: 0 50%;
+            transform: translate(-50%, -50%) rotate(0deg);
+            filter: drop-shadow(0 0 2px rgba(120, 0, 0, 0.75));
+        }
+        .shortest-path-arrow.dir-right {
+            transform: translate(-50%, -50%) rotate(0deg);
+        }
+        .shortest-path-arrow.dir-left {
+            transform: translate(-50%, -50%) rotate(180deg);
+        }
+        .shortest-path-arrow.dir-down {
+            transform: translate(-50%, -50%) rotate(90deg);
+        }
+        .shortest-path-arrow.dir-up {
+            transform: translate(-50%, -50%) rotate(-90deg);
+        }
 
         .placed {
             position: absolute;
@@ -604,6 +664,7 @@
         </div>
         <div id="gridContainer"><div id="grid"></div></div>
         <div id="placementHint"></div>
+        <div id="pathHud"></div>
         <div id="crosshairLayer">
             <div id="crosshairX" class="crosshair-line"></div>
             <div id="crosshairY" class="crosshair-line"></div>
@@ -797,6 +858,7 @@
                 c.className = 'cell';
                 grid.appendChild(c);
             }
+            createShortestPathLayer();
             createMapSectionLinesSVG();
 
             grid.addEventListener('dragover', e => e.preventDefault());
@@ -1112,6 +1174,176 @@
                 svg.appendChild(hl);
             }
             document.getElementById('grid').appendChild(svg);
+        }
+
+        function createShortestPathLayer() {
+            const grid = document.getElementById('grid');
+            if (!grid || document.getElementById('shortestPathLayer')) return;
+            const layer = document.createElement('div');
+            layer.id = 'shortestPathLayer';
+            grid.appendChild(layer);
+        }
+
+        function clearShortestPathDisplay() {
+            const layer = document.getElementById('shortestPathLayer');
+            if (layer) {
+                layer.innerHTML = '';
+            }
+            const hud = document.getElementById('pathHud');
+            if (hud) {
+                hud.style.display = 'none';
+                hud.textContent = '';
+            }
+        }
+
+        function renderShortestPath(pathCells) {
+            const layer = document.getElementById('shortestPathLayer');
+            const hud = document.getElementById('pathHud');
+            if (!layer || !hud || !Array.isArray(pathCells) || !pathCells.length) {
+                clearShortestPathDisplay();
+                return;
+            }
+
+            layer.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+            pathCells.forEach((cell, index) => {
+                const marker = document.createElement('div');
+                marker.className = 'shortest-path-cell';
+                if (index === 0) marker.classList.add('start');
+                if (index === pathCells.length - 1) marker.classList.add('end');
+                marker.style.left = `${cell.x * cellSize}px`;
+                marker.style.top = `${cell.y * cellSize}px`;
+
+                // Render an arrow towards the next path cell.
+                if (index < pathCells.length - 1) {
+                    const nextCell = pathCells[index + 1];
+                    const arrow = document.createElement('div');
+                    arrow.className = 'shortest-path-arrow';
+                    if (nextCell.x > cell.x) {
+                        arrow.classList.add('dir-right');
+                    } else if (nextCell.x < cell.x) {
+                        arrow.classList.add('dir-left');
+                    } else if (nextCell.y > cell.y) {
+                        arrow.classList.add('dir-down');
+                    } else {
+                        arrow.classList.add('dir-up');
+                    }
+                    marker.appendChild(arrow);
+                }
+
+                fragment.appendChild(marker);
+            });
+            layer.appendChild(fragment);
+
+            const steps = Math.max(0, pathCells.length - 1);
+            hud.textContent = `路径：${pathCells.length} 格（${steps} 步）`;
+            hud.style.display = 'block';
+        }
+
+        function buildPathBlockedMap() {
+            const total = cols * rows;
+            const blocked = new Uint8Array(total);
+
+            // 背景障碍：map 中非白色格子
+            const gridInfo = (mapColorData && mapColorData.grid) || {};
+            const mapCols = Math.min(cols, Number(gridInfo.cols) || 0);
+            const mapRows = Math.min(rows, Number(gridInfo.rows) || 0);
+            for (let y = 0; y < mapRows; y++) {
+                for (let x = 0; x < mapCols; x++) {
+                    const color = getMapColorForCell(x, y);
+                    const normalized = String(color || '').trim().toUpperCase();
+                    if (normalized && normalized !== '#FFFFFF') {
+                        blocked[y * cols + x] = 1;
+                    }
+                }
+            }
+
+            // 建筑障碍：已放置建筑覆盖区域
+            placed.forEach(building => {
+                const [ww, hh] = building.rot % 180 === 0 ? [building.w, building.h] : [building.h, building.w];
+                const x1 = Math.max(0, building.x);
+                const y1 = Math.max(0, building.y);
+                const x2 = Math.min(cols, building.x + ww);
+                const y2 = Math.min(rows, building.y + hh);
+                for (let y = y1; y < y2; y++) {
+                    const rowBase = y * cols;
+                    for (let x = x1; x < x2; x++) {
+                        blocked[rowBase + x] = 1;
+                    }
+                }
+            });
+
+            return blocked;
+        }
+
+        function findShortestPathCells(startCell, endCell, blocked) {
+            if (!startCell || !endCell || !blocked) return null;
+            if (
+                startCell.x < 0 || startCell.y < 0 || startCell.x >= cols || startCell.y >= rows ||
+                endCell.x < 0 || endCell.y < 0 || endCell.x >= cols || endCell.y >= rows
+            ) {
+                return null;
+            }
+
+            const startIdx = startCell.y * cols + startCell.x;
+            const endIdx = endCell.y * cols + endCell.x;
+            if (blocked[startIdx] || blocked[endIdx]) {
+                return null;
+            }
+            if (startIdx === endIdx) {
+                return [{ x: startCell.x, y: startCell.y }];
+            }
+
+            const total = cols * rows;
+            const visited = new Uint8Array(total);
+            const prev = new Int32Array(total);
+            prev.fill(-1);
+            const queue = new Int32Array(total);
+            let head = 0;
+            let tail = 0;
+
+            visited[startIdx] = 1;
+            queue[tail++] = startIdx;
+
+            while (head < tail) {
+                const current = queue[head++];
+                if (current === endIdx) break;
+
+                const x = current % cols;
+                const y = Math.floor(current / cols);
+
+                const neighbors = [
+                    [x + 1, y],
+                    [x - 1, y],
+                    [x, y + 1],
+                    [x, y - 1]
+                ];
+
+                for (let i = 0; i < neighbors.length; i++) {
+                    const nx = neighbors[i][0];
+                    const ny = neighbors[i][1];
+                    if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+                    const nextIdx = ny * cols + nx;
+                    if (visited[nextIdx] || blocked[nextIdx]) continue;
+                    visited[nextIdx] = 1;
+                    prev[nextIdx] = current;
+                    queue[tail++] = nextIdx;
+                }
+            }
+
+            if (!visited[endIdx]) {
+                return null;
+            }
+
+            const path = [];
+            let cursor = endIdx;
+            while (cursor !== -1) {
+                path.push({ x: cursor % cols, y: Math.floor(cursor / cols) });
+                if (cursor === startIdx) break;
+                cursor = prev[cursor];
+            }
+            path.reverse();
+            return path;
         }
 
         function updateMapSectionLines() {
@@ -2127,6 +2359,10 @@
             const movingBuildings = movingIds.map(movingId => getPlacedById(movingId)).filter(Boolean);
             const anchor = getPlacedById(id);
             if (!anchor || !movingBuildings.length) return;
+
+            // Dragging buildings should hide the previously rendered shortest-path info.
+            clearShortestPathDisplay();
+
             const movingOriginalPos = new Map(movingBuildings.map(building => [building.id, { x: building.x, y: building.y }]));
 
             const startX = e.clientX;
@@ -2233,6 +2469,9 @@
             const selectionBox = document.getElementById('selectionBox');
             const usingPointer = Boolean(pointerConfig);
             const pointerId = pointerConfig ? pointerConfig.pointerId : null;
+            const startCell = getGridPositionFromClient(startX, startY);
+            const blockedMap = buildPathBlockedMap();
+            let lastPathEndKey = '';
 
             selectionBox.style.display = 'block';
             selectionBox.style.left = `${startX}px`;
@@ -2258,6 +2497,26 @@
                 selectionBox.style.top = `${y}px`;
                 selectionBox.style.width = `${w}px`;
                 selectionBox.style.height = `${h}px`;
+
+                const endCell = getGridPositionFromClient(ev.clientX, ev.clientY);
+                if (!startCell || !endCell) {
+                    clearShortestPathDisplay();
+                    lastPathEndKey = '';
+                    return;
+                }
+
+                const endKey = `${endCell.x},${endCell.y}`;
+                if (endKey === lastPathEndKey) {
+                    return;
+                }
+                lastPathEndKey = endKey;
+
+                const path = findShortestPathCells(startCell, endCell, blockedMap);
+                if (path && path.length) {
+                    renderShortestPath(path);
+                } else {
+                    clearShortestPathDisplay();
+                }
             }
 
             function onUp(ev) {
