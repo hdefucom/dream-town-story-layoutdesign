@@ -26,7 +26,7 @@ stages:
         script:
           - '# 请在此输入您想执行的脚本'
           - echo 'Hello Gitee!'
-          - var/www/deploy.sh
+          - /var/www/deploy.sh
         gitClone: false
         notify: []
         strategy:
