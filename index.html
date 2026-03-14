@@ -1117,7 +1117,27 @@
             return sizeColorPalette[hash % sizeColorPalette.length];
         }
 
+        function getOneByOneNameColor(name) {
+            const normalized = String(name || '').trim();
+            if (normalized.includes('金杯像')) {
+                return 'rgba(255, 222, 92, 0.50)';
+            }
+            if (normalized.includes('银杯像')) {
+                return 'rgba(214, 221, 229, 0.46)';
+            }
+            if (normalized.includes('铜杯像')) {
+                return 'rgba(201, 132, 58, 0.52)';
+            }
+            if (normalized.endsWith('像')) {
+                return 'rgba(242, 56, 52, 0.60)';
+            }
+            return 'rgba(96, 88, 80, 0.50)';
+        }
+
         function getBuildingBaseColor(building) {
+            if (Number(building.w) === 1 && Number(building.h) === 1) {
+                return getOneByOneNameColor(building.name);
+            }
             return getColorFromSizeKey(getSizeColorKey(building.w, building.h));
         }
 
