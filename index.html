@@ -2519,8 +2519,6 @@
             const worldY = (container.scrollTop + offsetY) / scale;
             const lineXIndex = Math.max(0, Math.min(cols, Math.round(worldX / cellSize)));
             const lineYIndex = Math.max(0, Math.min(rows, Math.round(worldY / cellSize)));
-            const cellX = Math.max(0, Math.min(cols - 1, Math.floor(worldX / cellSize)));
-            const cellY = Math.max(0, Math.min(rows - 1, Math.floor(worldY / cellSize)));
 
             const screenLineX = lineXIndex * cellSize * scale - container.scrollLeft;
             const screenLineY = lineYIndex * cellSize * scale - container.scrollTop;
@@ -2535,7 +2533,8 @@
             layer.style.display = 'block';
             crossX.style.top = `${containerOffsetY + screenLineY}px`;
             crossY.style.left = `${containerOffsetX + screenLineX}px`;
-            hud.textContent = `X: ${cellX}, Y: ${cellY}`;
+            // Keep HUD coordinates consistent with crosshair snapping lines.
+            hud.textContent = `X: ${lineXIndex}, Y: ${lineYIndex}`;
         }
 
         function scheduleViewportCacheUpdate() {
