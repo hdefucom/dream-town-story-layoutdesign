@@ -663,6 +663,7 @@
         let manualVisible = false;
         let hoverClientX = null;
         let hoverClientY = null;
+        let copiedBuildingsSnapshot = null;
         const panPressedKeys = new Set();
         let panShiftPressed = false;
         let panAnimationId = null;
@@ -2227,6 +2228,21 @@
                 return;
             }
 
+            const key = e.key.toLowerCase();
+            const isClipboardModifier = e.ctrlKey || e.metaKey;
+            if (isClipboardModifier && key === 'c') {
+                if (copySelectedBuildings()) {
+                    e.preventDefault();
+                }
+                return;
+            }
+            if (isClipboardModifier && key === 'v') {
+                if (pasteCopiedBuildings()) {
+                    e.preventDefault();
+                }
+                return;
+            }
+
             if (manualVisible && e.key !== 'Escape') {
                 return;
             }
@@ -2247,7 +2263,6 @@
                 return;
             }
 
-            const key = e.key.toLowerCase();
             if (key === 'shift') {
                 panShiftPressed = true;
                 return;
@@ -2281,6 +2296,127 @@
             if (panAnimationId !== null) return;
             panLastTime = 0;
             panAnimationId = requestAnimationFrame(runKeyPanLoop);
+        }
+
+        function getCurrentSelectionIds() {
+            if (selectedBuildingIds.size) {
+                return Array.from(selectedBuildingIds);
+            }
+            if (selectedBuildingId !== null) {
+                return [selectedBuildingId];
+            }
+            return [];
+        }
+
+        function copySelectedBuildings() {
+            const ids = getCurrentSelectionIds();
+            if (!ids.length) return false;
+
+            const buildings = ids
+                .map(id => getPlacedById(id))
+                .filter(Boolean)
+                .sort((a, b) => (a.y - b.y) || (a.x - b.x) || (a.id - b.id));
+            if (!buildings.length) return false;
+
+            copiedBuildingsSnapshot = buildings.map(building => ({
+                name: building.name,
+                x: building.x,
+                y: building.y,
+                w: building.w,
+                h: building.h,
+                rot: building.rot
+            }));
+            return true;
+        }
+
+        function canPlaceSnapshotAtOffset(snapshot, offsetX, offsetY) {
+            const planned = [];
+            for (const item of snapshot) {
+                const x = item.x + offsetX;
+                const y = item.y + offsetY;
+                const [ww, hh] = item.rot % 180 === 0 ? [item.w, item.h] : [item.h, item.w];
+
+                if (x < 0 || y < 0 || x + ww > cols || y + hh > rows) {
+                    return null;
+                }
+                if (checkOverlap(null, x, y, item.w, item.h, item.rot)) {
+                    return null;
+                }
+                if (!canOccupyOnMapOverlay(x, y, item.w, item.h, item.rot)) {
+                    return null;
+                }
+
+                const currentRect = { x1: x, y1: y, x2: x + ww, y2: y + hh };
+                for (const other of planned) {
+                    if (overlapsRect(currentRect, other.rect)) {
+                        return null;
+                    }
+                }
+
+                planned.push({
+                    name: item.name,
+                    x,
+                    y,
+                    w: item.w,
+                    h: item.h,
+                    rot: item.rot,
+                    rect: currentRect
+                });
+            }
+            return planned;
+        }
+
+        function findPastePlan(snapshot) {
+            const startOffsetX = 1;
+            const startOffsetY = 1;
+            const maxRadius = Math.max(cols, rows);
+
+            for (let radius = 0; radius <= maxRadius; radius++) {
+                for (let dx = -radius; dx <= radius; dx++) {
+                    for (let dy = -radius; dy <= radius; dy++) {
+                        if (radius > 0 && Math.abs(dx) < radius && Math.abs(dy) < radius) {
+                            continue;
+                        }
+                        const plan = canPlaceSnapshotAtOffset(snapshot, startOffsetX + dx, startOffsetY + dy);
+                        if (plan) {
+                            return plan;
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        function pasteCopiedBuildings() {
+            if (!copiedBuildingsSnapshot || !copiedBuildingsSnapshot.length) {
+                return false;
+            }
+
+            const plan = findPastePlan(copiedBuildingsSnapshot);
+            if (!plan) {
+                alert('附近没有足够空间可粘贴该建筑集群。');
+                return true;
+            }
+
+            const createdIds = [];
+            for (const item of plan) {
+                const created = placeBuilding(item.name, item.x, item.y, item.w, item.h, item.rot, {
+                    skipRefresh: true,
+                    resolveOccupied: false
+                });
+                if (created) {
+                    createdIds.push(created.id);
+                }
+            }
+
+            if (!createdIds.length) {
+                return true;
+            }
+
+            calculateBuffers();
+            updateCache();
+            setSelection(createdIds, createdIds[0]);
+            return true;
         }
 
         function stopKeyPanLoop() {
