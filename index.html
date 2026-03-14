@@ -814,6 +814,31 @@
             return typeof color === 'string' ? color : null;
         }
 
+        function canOccupyOnMapOverlay(x, y, w, h, rot) {
+            if (!mapColorEnabled) return true;
+            const gridInfo = (mapColorData && mapColorData.grid) || {};
+            const mapCols = Number(gridInfo.cols) || 100;
+            const mapRows = Number(gridInfo.rows) || 100;
+            const [ww, hh] = rot % 180 === 0 ? [w, h] : [h, w];
+
+            // 开启地图约束时，只允许在地图定义的100x100范围内活动
+            if (x < 0 || y < 0 || x + ww > mapCols || y + hh > mapRows) {
+                return false;
+            }
+
+            // 非白色格子视为障碍，不允许重叠
+            for (let yy = y; yy < y + hh; yy++) {
+                for (let xx = x; xx < x + ww; xx++) {
+                    const color = getMapColorForCell(xx, yy);
+                    const normalized = String(color || '').trim().toUpperCase();
+                    if (normalized !== '#FFFFFF') {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
         function applyMapColorOverlay() {
             if (!gridCellsCache || gridCellsCache.length !== cols * rows) {
                 gridCellsCache = Array.from(document.querySelectorAll('#grid .cell'));
@@ -1638,6 +1663,10 @@
                         canMove = false;
                         break;
                     }
+                    if (!canOccupyOnMapOverlay(nextX, nextY, building.w, building.h, building.rot)) {
+                        canMove = false;
+                        break;
+                    }
                     nextPositions.set(building.id, { x: nextX, y: nextY });
                 }
 
@@ -2121,6 +2150,8 @@
 
             const screenLineX = lineXIndex * cellSize * scale - container.scrollLeft;
             const screenLineY = lineYIndex * cellSize * scale - container.scrollTop;
+            const containerOffsetX = container.offsetLeft;
+            const containerOffsetY = container.offsetTop;
 
             const layer = document.getElementById('crosshairLayer');
             const crossX = document.getElementById('crosshairX');
@@ -2128,8 +2159,8 @@
             const hud = document.getElementById('coordHud');
 
             layer.style.display = 'block';
-            crossX.style.top = `${screenLineY}px`;
-            crossY.style.left = `${screenLineX}px`;
+            crossX.style.top = `${containerOffsetY + screenLineY}px`;
+            crossY.style.left = `${containerOffsetX + screenLineX}px`;
             hud.textContent = `X: ${cellX}, Y: ${cellY}`;
         }
 
