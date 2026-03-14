@@ -215,6 +215,17 @@
             padding: 5px 8px;
             flex: 0 0 auto;
         }
+        #mapTopControls button.active {
+            background: var(--accent-soft);
+            border-color: rgba(29, 107, 87, 0.45);
+            color: var(--accent);
+            font-weight: 700;
+            box-shadow: inset 0 0 0 1px rgba(29, 107, 87, 0.12);
+        }
+        #mapTopControls button.active:hover {
+            background: #d9efe5;
+            border-color: rgba(29, 107, 87, 0.55);
+        }
         #gridContainer {
             width: 100%;
             height: 100%;
@@ -797,6 +808,7 @@
             const button = document.getElementById('mapColorToggleBtn');
             if (!button) return;
             button.classList.toggle('active', mapColorEnabled);
+            button.textContent = `地图：${mapColorEnabled ? '开' : '关'}`;
         }
 
         function getMapColorForCell(x, y) {
@@ -871,6 +883,7 @@
             const button = document.getElementById('gridLineToggleBtn');
             if (!button) return;
             button.classList.toggle('active', gridLineDarkMode);
+            button.textContent = `网格：${gridLineDarkMode ? '黑' : '白'}`;
         }
 
         function applyGridLineColor() {
