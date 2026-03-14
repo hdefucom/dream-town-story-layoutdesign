@@ -591,14 +591,9 @@
             <div id="coordHud">X: 0, Y: 0</div>
         </div>
         <div id="mobileActionBar">
-            <button id="mobilePaletteBtn" class="action-button" type="button">建筑</button>
             <button id="mobileRotateBtn" class="action-button" type="button">旋转</button>
-            <button id="mobileUndoBtn" class="action-button" type="button">撤销</button>
-            <button id="mobileRedoBtn" class="action-button" type="button">重做</button>
             <button id="mobileDeleteBtn" class="action-button danger" type="button">删除</button>
             <button id="mobileMultiSelectBtn" class="action-button" type="button">多选</button>
-            <button id="mobileDetailsBtn" class="action-button" type="button">明细</button>
-            <button id="mobileManualBtn" class="action-button" type="button">说明</button>
         </div>
     </div>
     <aside id="detailsPanel">
@@ -761,13 +756,8 @@
             document.getElementById('paletteCloseBtn').addEventListener('click', closePanels);
             document.getElementById('detailsCloseBtn').addEventListener('click', closePanels);
             document.getElementById('panelBackdrop').addEventListener('click', closePanels);
-            document.getElementById('mobilePaletteBtn').addEventListener('click', () => togglePanel('palette'));
-            document.getElementById('mobileDetailsBtn').addEventListener('click', () => togglePanel('details'));
             document.getElementById('mobileRotateBtn').addEventListener('click', rotateSelectedBuilding);
-            document.getElementById('mobileUndoBtn').addEventListener('click', () => undoHistory());
-            document.getElementById('mobileRedoBtn').addEventListener('click', () => redoHistory());
             document.getElementById('mobileDeleteBtn').addEventListener('click', deleteSelectedBuildings);
-            document.getElementById('mobileManualBtn').addEventListener('click', showManual);
             document.getElementById('mobileMultiSelectBtn').addEventListener('click', () => {
                 mobileMultiSelectMode = !mobileMultiSelectMode;
                 const btn = document.getElementById('mobileMultiSelectBtn');
