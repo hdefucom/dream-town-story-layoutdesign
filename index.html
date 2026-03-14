@@ -562,6 +562,8 @@
             </div>
             <div class="map-top-group">
                 <span class="map-top-group-title">地图工具</span>
+                <button id="undoBtn" type="button">撤销</button>
+                <button id="redoBtn" type="button">重做</button>
                 <button id="mapColorToggleBtn" type="button">地图</button>
                 <button id="gridLineToggleBtn" type="button">网格</button>
                 <button id="rotateGroupBtn" type="button">群转90°</button>
@@ -664,6 +666,10 @@
         let hoverClientX = null;
         let hoverClientY = null;
         let copiedBuildingsSnapshot = null;
+        const historyStack = [];
+        let historyIndex = -1;
+        let isApplyingHistory = false;
+        const maxHistoryEntries = 120;
         const panPressedKeys = new Set();
         let panShiftPressed = false;
         let panAnimationId = null;
@@ -719,6 +725,8 @@
             document.getElementById('importInput').addEventListener('change', onImportFile);
             document.getElementById('mapColorToggleBtn').addEventListener('click', toggleMapColorOverlay);
             document.getElementById('gridLineToggleBtn').addEventListener('click', toggleGridLineColor);
+            document.getElementById('undoBtn').addEventListener('click', () => undoHistory());
+            document.getElementById('redoBtn').addEventListener('click', () => redoHistory());
             document.getElementById('rotateGroupBtn').addEventListener('click', rotateSelectedGroupClockwise);
             document.getElementById('paletteToggleBtn').addEventListener('click', () => togglePanel('palette'));
             document.getElementById('detailsToggleBtn').addEventListener('click', () => togglePanel('details'));
@@ -778,8 +786,148 @@
             updatePlacementHint();
             updateMapColorToggleUi();
             updateGridLineToggleUi();
+            resetHistoryWithCurrentState();
             showManual();
             
+        }
+
+        function buildSerializableState() {
+            return {
+                placed: placed.map(item => ({
+                    name: item.name,
+                    x: item.x,
+                    y: item.y,
+                    w: item.w,
+                    h: item.h,
+                    rot: item.rot
+                })),
+                nextPlacedId,
+                selectedIds: Array.from(selectedBuildingIds),
+                primarySelectedId: selectedBuildingId
+            };
+        }
+
+        function updateHistoryButtons() {
+            const undoBtn = document.getElementById('undoBtn');
+            const redoBtn = document.getElementById('redoBtn');
+            if (undoBtn) {
+                undoBtn.disabled = historyIndex <= 0;
+            }
+            if (redoBtn) {
+                redoBtn.disabled = historyIndex >= historyStack.length - 1;
+            }
+        }
+
+        function resetHistoryWithCurrentState() {
+            historyStack.length = 0;
+            historyStack.push(JSON.stringify(buildSerializableState()));
+            historyIndex = 0;
+            updateHistoryButtons();
+        }
+
+        function pushHistoryState() {
+            if (isApplyingHistory) return;
+            const serialized = JSON.stringify(buildSerializableState());
+            if (historyIndex >= 0 && historyStack[historyIndex] === serialized) {
+                updateHistoryButtons();
+                return;
+            }
+
+            if (historyIndex < historyStack.length - 1) {
+                historyStack.splice(historyIndex + 1);
+            }
+
+            historyStack.push(serialized);
+            if (historyStack.length > maxHistoryEntries) {
+                historyStack.shift();
+            } else {
+                historyIndex += 1;
+            }
+            if (historyStack.length > 0 && historyIndex < 0) {
+                historyIndex = 0;
+            }
+            updateHistoryButtons();
+        }
+
+        function applySerializableState(serialized) {
+            if (!serialized) return false;
+            let state;
+            try {
+                state = JSON.parse(serialized);
+            } catch (e) {
+                console.warn('history parse failed', e);
+                return false;
+            }
+
+            isApplyingHistory = true;
+            try {
+                placed.splice(0, placed.length);
+                nextPlacedId = 0;
+                document.querySelectorAll('.placed').forEach(element => element.remove());
+
+                const grid = document.getElementById('grid');
+                const fragment = document.createDocumentFragment();
+                const items = Array.isArray(state.placed) ? state.placed : [];
+                items.forEach(item => {
+                    const created = placeBuilding(item.name, item.x, item.y, item.w, item.h, item.rot, {
+                        skipRefresh: true,
+                        resolveOccupied: false,
+                        renderTarget: fragment
+                    });
+                    if (created) {
+                        nextPlacedId = Math.max(nextPlacedId, created.id + 1);
+                    }
+                });
+                grid.appendChild(fragment);
+
+                const selectedIds = Array.isArray(state.selectedIds) ? state.selectedIds : [];
+                const validSelectedIds = selectedIds.filter(id => placed.some(item => item.id === id));
+                const primary = validSelectedIds.includes(state.primarySelectedId)
+                    ? state.primarySelectedId
+                    : (validSelectedIds[0] ?? null);
+
+                if (validSelectedIds.length) {
+                    setSelection(validSelectedIds, primary);
+                } else {
+                    clearSelectedBuilding();
+                }
+
+                calculateBuffers();
+                updateCache();
+            } finally {
+                isApplyingHistory = false;
+            }
+
+            updateHistoryButtons();
+            return true;
+        }
+
+        function undoHistory() {
+            if (historyIndex <= 0) {
+                updateHistoryButtons();
+                return false;
+            }
+            historyIndex -= 1;
+            const ok = applySerializableState(historyStack[historyIndex]);
+            if (!ok) {
+                historyIndex += 1;
+            }
+            updateHistoryButtons();
+            return ok;
+        }
+
+        function redoHistory() {
+            if (historyIndex >= historyStack.length - 1) {
+                updateHistoryButtons();
+                return false;
+            }
+            historyIndex += 1;
+            const ok = applySerializableState(historyStack[historyIndex]);
+            if (!ok) {
+                historyIndex -= 1;
+            }
+            updateHistoryButtons();
+            return ok;
         }
 
         function saveUiPrefs() {
@@ -1137,6 +1285,7 @@
 
             calculateBuffers();
             updateCache();
+            pushHistoryState();
         }
 
         function getSizeColorKey(w, h) {
@@ -1235,7 +1384,7 @@
 
         function loadLayoutFile(filePath) {
             fetchJsonNoCache(filePath).then(arr=>{
-                loadPlacedItems(arr);
+                loadPlacedItems(arr, { recordHistory: true });
             }).catch(err=>{
                 alert('加载布局失败: ' + err.message);
             });
@@ -1252,7 +1401,8 @@
             return new Promise(resolve => requestAnimationFrame(resolve));
         }
 
-        async function loadPlacedItems(items) {
+        async function loadPlacedItems(items, options = {}) {
+            const { recordHistory = true, resetHistory = false } = options;
             setPendingPlacement(null);
             resetPlacedBuildings();
             const grid = document.getElementById('grid');
@@ -1275,6 +1425,11 @@
 
             calculateBuffers();
             updateCache();
+            if (resetHistory) {
+                resetHistoryWithCurrentState();
+            } else if (recordHistory) {
+                pushHistoryState();
+            }
         }
 
         function populatePalette() {
@@ -1398,6 +1553,7 @@
             if (!skipRefresh) {
                 calculateBuffers();
                 updateCache();
+                pushHistoryState();
             }
             return obj;
         }
@@ -1628,6 +1784,7 @@
             div.style.height = hh * cellSize + 'px';
             calculateBuffers();
             updateCache();
+            pushHistoryState();
         }
 
         // dragging helpers
@@ -1736,6 +1893,7 @@
                 bufferDebounceTimer = setTimeout(() => {
                     calculateBuffers();
                     updateCache();
+                    pushHistoryState();
                     bufferDebounceTimer = null;
                 }, 100);
             }
@@ -2230,6 +2388,20 @@
 
             const key = e.key.toLowerCase();
             const isClipboardModifier = e.ctrlKey || e.metaKey;
+            const isUndoShortcut = isClipboardModifier && key === 'z' && !e.shiftKey;
+            const isRedoShortcut = isClipboardModifier && ((key === 'z' && e.shiftKey) || key === 'y');
+            if (isUndoShortcut) {
+                if (undoHistory()) {
+                    e.preventDefault();
+                }
+                return;
+            }
+            if (isRedoShortcut) {
+                if (redoHistory()) {
+                    e.preventDefault();
+                }
+                return;
+            }
             if (isClipboardModifier && key === 'c') {
                 if (copySelectedBuildings()) {
                     e.preventDefault();
@@ -2416,6 +2588,7 @@
             calculateBuffers();
             updateCache();
             setSelection(createdIds, createdIds[0]);
+            pushHistoryState();
             return true;
         }
 
@@ -2514,6 +2687,7 @@
                 }
                 calculateBuffers();
                 updateCache();
+                pushHistoryState();
             }
         }
 
@@ -2539,13 +2713,14 @@
 
             calculateBuffers();
             updateCache();
+            pushHistoryState();
         }
         function loadCache(){
             const raw = localStorage.getItem('layoutCache');
             if(raw){
                 try{
                     const arr=JSON.parse(raw);
-                    loadPlacedItems(arr);
+                    loadPlacedItems(arr, { recordHistory: false, resetHistory: true });
                 }catch(e){console.warn('load cache error',e);}            }
         }
         function exportLayout(){
@@ -2563,7 +2738,7 @@
             reader.onload = ()=>{
                 try{
                     const arr=JSON.parse(reader.result);
-                    loadPlacedItems(arr);
+                    loadPlacedItems(arr, { recordHistory: true });
                 }catch(err){alert('导入失败');}
             };
             reader.readAsText(file);
@@ -2575,6 +2750,9 @@
             resetPlacedBuildings();
             localStorage.removeItem('layoutCache');
             setPendingPlacement(null);
+            calculateBuffers();
+            updateCache();
+            pushHistoryState();
         }
         window.onload = ()=>{ initGrid(); loadData(); };
     </script>
