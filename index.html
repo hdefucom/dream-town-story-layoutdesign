@@ -11,6 +11,7 @@
             --panel: rgba(255, 252, 246, 0.96);
             --panel-strong: #fffaf0;
             --line: #d8cdbd;
+            --cell-line: rgba(255, 255, 255, 0.38);
             --text: #2d2418;
             --muted: #6b6256;
             --accent: #1d6b57;
@@ -176,7 +177,7 @@
             grid-template-rows: repeat(var(--rows), 40px);
             box-shadow: inset 0 0 0 1px rgba(101, 91, 78, 0.08);
         }
-        #grid .cell { width: 40px; height: 40px; border: 1px solid rgba(255, 255, 255, 0.38); }
+        #grid .cell { width: 40px; height: 40px; border: 1px solid var(--cell-line); }
         #placementHint {
             position: absolute;
             top: 12px;
@@ -347,6 +348,12 @@
             background: color-mix(in srgb, var(--accent) 88%, #000);
             border-color: transparent;
         }
+        #palette button.active {
+            background: var(--accent-soft);
+            border-color: rgba(29, 107, 87, 0.42);
+            color: var(--accent);
+            font-weight: 700;
+        }
 
         #manualOverlay {
             position: fixed;
@@ -461,6 +468,8 @@
             <button id="importBtn" type="button">导入</button>
             <button id="clearBtn" type="button">清空</button>
             <button id="manualOpenBtn" type="button">说明</button>
+            <button id="mapColorToggleBtn" type="button">地图</button>
+            <button id="gridLineToggleBtn" type="button">网格</button>
         </div>
     </div>
     <div id="mapContainer">
@@ -542,6 +551,10 @@
     <script>
         const cols = 200, rows = 200, cellSize = 40;
         let buildData = [], buffData = [], layoutsData = [];
+        let mapColorData = null;
+        let mapColorEnabled = false;
+        let gridLineDarkMode = false;
+        let gridCellsCache = null;
         const placed = [];
         let scale = 1;
         let selectedBuildingId = null;
@@ -586,6 +599,7 @@
         const isMacPlatform = /mac/i.test(navigator.platform || '');
         const coarsePointerMedia = window.matchMedia('(hover: none), (pointer: coarse)');
         const cacheBustToken = String(Date.now());
+        const uiPrefsCacheKey = 'uiPrefs';
 
         function isAdditiveSelectModifier(event) {
             if (mobileMultiSelectMode) return true;
@@ -608,6 +622,8 @@
             document.getElementById('manualOpenBtn').addEventListener('click', showManual);
             document.getElementById('importBtn').addEventListener('click', ()=>document.getElementById('importInput').click());
             document.getElementById('importInput').addEventListener('change', onImportFile);
+            document.getElementById('mapColorToggleBtn').addEventListener('click', toggleMapColorOverlay);
+            document.getElementById('gridLineToggleBtn').addEventListener('click', toggleGridLineColor);
             document.getElementById('paletteToggleBtn').addEventListener('click', () => togglePanel('palette'));
             document.getElementById('detailsToggleBtn').addEventListener('click', () => togglePanel('details'));
             document.getElementById('paletteCloseBtn').addEventListener('click', closePanels);
@@ -660,10 +676,106 @@
             } else if (coarsePointerMedia.addListener) {
                 coarsePointerMedia.addListener(handleViewportResize);
             }
+            loadUiPrefs();
+            applyGridLineColor();
             loadViewportCache();
             updatePlacementHint();
+            updateMapColorToggleUi();
+            updateGridLineToggleUi();
             showManual();
             
+        }
+
+        function saveUiPrefs() {
+            try {
+                localStorage.setItem(uiPrefsCacheKey, JSON.stringify({
+                    mapColorEnabled,
+                    gridLineDarkMode
+                }));
+            } catch (e) {
+                console.warn('save ui prefs failed', e);
+            }
+        }
+
+        function loadUiPrefs() {
+            try {
+                const raw = localStorage.getItem(uiPrefsCacheKey);
+                if (!raw) return;
+                const prefs = JSON.parse(raw);
+                mapColorEnabled = Boolean(prefs.mapColorEnabled);
+                gridLineDarkMode = Boolean(prefs.gridLineDarkMode);
+            } catch (e) {
+                console.warn('load ui prefs failed', e);
+            }
+        }
+
+        function updateMapColorToggleUi() {
+            const button = document.getElementById('mapColorToggleBtn');
+            if (!button) return;
+            button.classList.toggle('active', mapColorEnabled);
+        }
+
+        function getMapColorForCell(x, y) {
+            if (!mapColorData || !mapColorData.bitmap) return null;
+            const gridInfo = mapColorData.grid || {};
+            const mapCols = Number(gridInfo.cols) || 0;
+            const mapRows = Number(gridInfo.rows) || 0;
+            if (x < 0 || y < 0 || x >= mapCols || y >= mapRows) return null;
+
+            const row = mapColorData.bitmap[y];
+            if (typeof row !== 'string' || x >= row.length) return null;
+            const symbol = row[x];
+            const symbolMap = (mapColorData.encoding && mapColorData.encoding.symbolMap) || {};
+            const color = symbolMap[symbol];
+            return typeof color === 'string' ? color : null;
+        }
+
+        function applyMapColorOverlay() {
+            if (!gridCellsCache || gridCellsCache.length !== cols * rows) {
+                gridCellsCache = Array.from(document.querySelectorAll('#grid .cell'));
+            }
+            if (!gridCellsCache.length) return;
+
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    const idx = y * cols + x;
+                    const cell = gridCellsCache[idx];
+                    if (!cell) continue;
+                    if (!mapColorEnabled) {
+                        cell.style.backgroundColor = '';
+                        continue;
+                    }
+                    const color = getMapColorForCell(x, y);
+                    cell.style.backgroundColor = color || '';
+                }
+            }
+        }
+
+        function toggleMapColorOverlay() {
+            mapColorEnabled = !mapColorEnabled;
+            updateMapColorToggleUi();
+            applyMapColorOverlay();
+            saveUiPrefs();
+        }
+
+        function updateGridLineToggleUi() {
+            const button = document.getElementById('gridLineToggleBtn');
+            if (!button) return;
+            button.classList.toggle('active', gridLineDarkMode);
+        }
+
+        function applyGridLineColor() {
+            document.documentElement.style.setProperty(
+                '--cell-line',
+                gridLineDarkMode ? 'rgba(24, 24, 24, 0.42)' : 'rgba(255, 255, 255, 0.38)'
+            );
+        }
+
+        function toggleGridLineColor() {
+            gridLineDarkMode = !gridLineDarkMode;
+            applyGridLineColor();
+            updateGridLineToggleUi();
+            saveUiPrefs();
         }
 
         function isMobileLayout() {
@@ -820,6 +932,12 @@
             fetchJsonNoCache('layouts.json').then(data=>{
                 layoutsData = data;
                 populateLayouts();
+            });
+            fetchJsonNoCache('map_100x100_cells_colors.json').then(data => {
+                mapColorData = data;
+                applyMapColorOverlay();
+            }).catch(err => {
+                console.warn('load map colors error', err);
             });
         }
 
