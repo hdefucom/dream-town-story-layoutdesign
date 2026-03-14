@@ -599,6 +599,7 @@
                 <button id="gridLineToggleBtn" type="button">网格</button>
                 <button id="sectionLineToggleBtn" type="button">分区</button>
                 <button id="rotateGroupBtn" type="button">群转90°</button>
+                <button id="mirrorGroupBtn" type="button">镜像</button>
             </div>
         </div>
         <div id="gridContainer"><div id="grid"></div></div>
@@ -644,7 +645,7 @@
                 <div class="manual-section-title">工具条操作</div>
                 <ul class="manual-list">
                     <li>顶部工具条支持导入、导出、清空和打开说明。</li>
-                    <li>地图工具支持撤销/重做、地图底色开关、网格线黑白切换和群转90°。</li>
+                    <li>地图工具支持撤销/重做、地图底色开关、网格线黑白切换、群转90°和镜像。</li>
                     <li>撤销快捷键：Ctrl/Cmd + Z；重做快捷键：Ctrl/Cmd + Y（macOS 也支持 Cmd + Shift + Z）。</li>
                 </ul>
             </div>
@@ -773,6 +774,7 @@
             document.getElementById('undoBtn').addEventListener('click', () => undoHistory());
             document.getElementById('redoBtn').addEventListener('click', () => redoHistory());
             document.getElementById('rotateGroupBtn').addEventListener('click', rotateSelectedGroupClockwise);
+            document.getElementById('mirrorGroupBtn').addEventListener('click', mirrorSelectedGroupVertically);
             document.getElementById('paletteToggleBtn').addEventListener('click', () => togglePanel('palette'));
             document.getElementById('detailsToggleBtn').addEventListener('click', () => togglePanel('details'));
             document.getElementById('paletteCloseBtn').addEventListener('click', closePanels);
@@ -1412,6 +1414,129 @@
                     div.style.top = `${building.y * cellSize}px`;
                     div.style.width = `${next.fp.w * cellSize}px`;
                     div.style.height = `${next.fp.h * cellSize}px`;
+                }
+            }
+
+            calculateBuffers();
+            updateCache();
+            pushHistoryState();
+        }
+
+        function mirrorRotationVertically(rot) {
+            const normalized = ((rot % 360) + 360) % 360;
+            if (normalized === 90) return 270;
+            if (normalized === 270) return 90;
+            return normalized;
+        }
+
+        function mirrorSelectedGroupVertically() {
+            const selectedIds = Array.from(selectedBuildingIds);
+            if (!selectedIds.length && selectedBuildingId !== null) {
+                selectedIds.push(selectedBuildingId);
+            }
+            if (!selectedIds.length) return;
+
+            const selectedSet = new Set(selectedIds);
+            const selectedBuildings = selectedIds.map(id => getPlacedById(id)).filter(Boolean);
+            if (!selectedBuildings.length) return;
+
+            // 以选中集群外接包围盒的垂直中轴线进行镜像
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+            const sourceFootprints = new Map();
+
+            selectedBuildings.forEach(building => {
+                const fp = getFootprintByState(building.x, building.y, building.w, building.h, building.rot);
+                sourceFootprints.set(building.id, fp);
+                minX = Math.min(minX, fp.x1);
+                minY = Math.min(minY, fp.y1);
+                maxX = Math.max(maxX, fp.x2);
+                maxY = Math.max(maxY, fp.y2);
+            });
+
+            const centerX = (minX + maxX) / 2;
+            const nextState = new Map();
+
+            for (const building of selectedBuildings) {
+                const oldFp = sourceFootprints.get(building.id);
+                const buildingCenterX = (oldFp.x1 + oldFp.x2) / 2;
+                const buildingCenterY = (oldFp.y1 + oldFp.y2) / 2;
+
+                const mirroredCenterX = centerX - (buildingCenterX - centerX);
+                const mirroredCenterY = buildingCenterY;
+                const nextRot = mirrorRotationVertically(building.rot);
+                const [nextW, nextH] = nextRot % 180 === 0 ? [building.w, building.h] : [building.h, building.w];
+                const nextX = Math.round(mirroredCenterX - nextW / 2);
+                const nextY = Math.round(mirroredCenterY - nextH / 2);
+                const fp = {
+                    x1: nextX,
+                    y1: nextY,
+                    x2: nextX + nextW,
+                    y2: nextY + nextH,
+                    w: nextW,
+                    h: nextH
+                };
+
+                if (fp.x1 < 0 || fp.y1 < 0 || fp.x2 > cols || fp.y2 > rows) {
+                    alert('镜像后超出地图边界，操作已取消。');
+                    return;
+                }
+
+                if (!canOccupyOnMapOverlay(nextX, nextY, building.w, building.h, nextRot)) {
+                    alert('镜像后不满足地图约束（仅白色区域可放置），操作已取消。');
+                    return;
+                }
+
+                nextState.set(building.id, {
+                    x: nextX,
+                    y: nextY,
+                    rot: nextRot,
+                    fp
+                });
+            }
+
+            // 选中集群内部不能互相重叠
+            for (let i = 0; i < selectedBuildings.length; i++) {
+                for (let j = i + 1; j < selectedBuildings.length; j++) {
+                    const aId = selectedBuildings[i].id;
+                    const bId = selectedBuildings[j].id;
+                    const aFp = nextState.get(aId).fp;
+                    const bFp = nextState.get(bId).fp;
+                    if (overlapsRect(aFp, bFp)) {
+                        alert('镜像后选中建筑发生重叠，操作已取消。');
+                        return;
+                    }
+                }
+            }
+
+            // 不能与未选中建筑重叠
+            const staticBuildings = placed.filter(item => !selectedSet.has(item.id));
+            for (const building of selectedBuildings) {
+                const candidate = nextState.get(building.id).fp;
+                for (const other of staticBuildings) {
+                    const otherFp = getFootprintByState(other.x, other.y, other.w, other.h, other.rot);
+                    if (overlapsRect(candidate, otherFp)) {
+                        alert('镜像后与其他建筑重叠，操作已取消。');
+                        return;
+                    }
+                }
+            }
+
+            // 应用镜像结果
+            for (const building of selectedBuildings) {
+                const next = nextState.get(building.id);
+                building.x = next.x;
+                building.y = next.y;
+                building.rot = next.rot;
+                const div = document.querySelector(`.placed[data-id='${building.id}']`);
+                if (div) {
+                    div.style.left = `${building.x * cellSize}px`;
+                    div.style.top = `${building.y * cellSize}px`;
+                    div.style.width = `${next.fp.w * cellSize}px`;
+                    div.style.height = `${next.fp.h * cellSize}px`;
+                    applyBuildingVisualStyle(building, div);
                 }
             }
 
