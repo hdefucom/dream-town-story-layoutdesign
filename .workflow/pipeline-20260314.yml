@@ -7,6 +7,8 @@ triggers:
     branches:
       prefix:
         - ''
+  schedule:
+    - cron: '* 59 23 * * ? *'
 stages:
   - name: stage-3a52afb9
     displayName: 未命名
