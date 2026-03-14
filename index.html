@@ -100,7 +100,7 @@
 
         /* palette toolbar on the left */
         #palette {
-            flex: 0 0 240px;
+            flex: 0 0 170px;
             border-right: 1px solid rgba(122, 103, 74, 0.16);
             padding: 14px;
             overflow-y: auto;
@@ -227,7 +227,50 @@
         }
         .placed.selected { border-color: #c62828; box-shadow: 0 0 0 2px rgba(198, 40, 40, 0.2); }
         .placed.group-selected { border-color: #ef6c00; box-shadow: 0 0 0 2px rgba(239, 108, 0, 0.2); }
-        .placed.buff-source { background: rgba(46, 125, 50, 0.45); }
+        .placed.buff-source {
+            border-color: #c62828;
+            box-shadow:
+                0 0 0 3px rgba(255, 244, 179, 0.95),
+                0 0 0 6px rgba(198, 40, 40, 0.55),
+                0 8px 18px rgba(198, 40, 40, 0.28);
+            z-index: 2;
+        }
+        .placed.buff-source::after {
+            content: attr(data-buff-label);
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            max-width: 88px;
+            height: 18px;
+            padding: 0 6px;
+            border-radius: 999px;
+            background: #c62828;
+            color: #fff4e8;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 18px;
+            text-align: center;
+            letter-spacing: 0.2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            box-shadow: 0 4px 10px rgba(198, 40, 40, 0.28);
+            pointer-events: none;
+        }
+        .placed.selected.buff-source {
+            box-shadow:
+                0 0 0 2px rgba(198, 40, 40, 0.42),
+                0 0 0 5px rgba(255, 244, 179, 0.95),
+                0 0 0 8px rgba(198, 40, 40, 0.55),
+                0 8px 18px rgba(198, 40, 40, 0.28);
+        }
+        .placed.group-selected.buff-source {
+            box-shadow:
+                0 0 0 2px rgba(239, 108, 0, 0.42),
+                0 0 0 5px rgba(255, 244, 179, 0.95),
+                0 0 0 8px rgba(198, 40, 40, 0.55),
+                0 8px 18px rgba(198, 40, 40, 0.28);
+        }
         .placed .label {
             position: absolute;
             inset: 0;
@@ -250,7 +293,7 @@
         }
 
         #detailsPanel {
-            flex: 0 0 300px;
+            flex: 0 0 280px;
             border-left: 1px solid rgba(122, 103, 74, 0.16);
             padding: 14px;
             overflow-y: auto;
@@ -276,7 +319,7 @@
             right: 12px;
             bottom: 12px;
             z-index: 50;
-            grid-template-columns: repeat(5, minmax(0, 1fr));
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 8px;
         }
         #mobileActionBar .action-button {
@@ -284,6 +327,25 @@
             font-size: 12px;
             background: rgba(255, 250, 240, 0.96);
             backdrop-filter: blur(12px);
+        }
+        /* 多选按钮未激活时：虚线描边，暗示可切换 */
+        #mobileMultiSelectBtn {
+            border-style: dashed;
+            border-color: rgba(29, 107, 87, 0.35);
+            color: var(--accent);
+        }
+        /* 激活态：实色填充，强对比 */
+        .action-button.active {
+            background: var(--accent);
+            border-style: solid;
+            border-color: transparent;
+            color: #fff;
+            font-weight: 700;
+            box-shadow: 0 2px 8px rgba(29, 107, 87, 0.35);
+        }
+        .action-button.active:hover {
+            background: color-mix(in srgb, var(--accent) 88%, #000);
+            border-color: transparent;
         }
 
         #manualOverlay {
@@ -330,8 +392,8 @@
                 position: fixed;
                 top: 0;
                 bottom: 0;
-                width: min(84vw, 340px);
-                max-width: 340px;
+                width: min(76vw, 280px);
+                max-width: 280px;
                 z-index: 1200;
                 box-shadow: var(--shadow);
                 padding-top: 18px;
@@ -370,9 +432,6 @@
             .palette-action-group {
                 grid-template-columns: 1fr;
             }
-            #mobileActionBar {
-                grid-template-columns: repeat(3, minmax(0, 1fr));
-            }
             #coordHud {
                 bottom: 82px;
             }
@@ -398,10 +457,10 @@
         <h3>建筑列表</h3>
         <input type="file" id="importInput" style="display:none" accept="application/json" />
         <div class="palette-action-group">
-            <button id="exportBtn" type="button">导出布局</button>
-            <button id="importBtn" type="button">导入布局</button>
-            <button id="clearBtn" type="button">清空地图</button>
-            <button id="manualOpenBtn" type="button">操作手册</button>
+            <button id="exportBtn" type="button">导出</button>
+            <button id="importBtn" type="button">导入</button>
+            <button id="clearBtn" type="button">清空</button>
+            <button id="manualOpenBtn" type="button">说明</button>
         </div>
     </div>
     <div id="mapContainer">
@@ -416,6 +475,7 @@
             <button id="mobilePaletteBtn" class="action-button" type="button">建筑</button>
             <button id="mobileRotateBtn" class="action-button" type="button">旋转</button>
             <button id="mobileDeleteBtn" class="action-button danger" type="button">删除</button>
+            <button id="mobileMultiSelectBtn" class="action-button" type="button">多选</button>
             <button id="mobileDetailsBtn" class="action-button" type="button">明细</button>
             <button id="mobileManualBtn" class="action-button" type="button">说明</button>
         </div>
@@ -488,6 +548,7 @@
         let selectedBuildingIds = new Set();
         let selectedBuffIndex = null;
         let highlightedBuffSourceIds = [];
+        let highlightedBuffLabel = '';
         let nextPlacedId = 0;
         const bulkRenderBatchSize = 200;
         const keyboardPanSpeed = 850;
@@ -500,8 +561,10 @@
         let panAnimationId = null;
         let panLastTime = 0;
         let pendingPlacement = null;
-        const touchBoxPressDelay = 300;
-        const touchMoveCancelThreshold = 8;
+        let mobileMultiSelectMode = false;
+        let isPinching = false;
+        let pinchInitialDist = 0;
+        let pinchInitialScale = 1;
         const sizeColorPalette = [
             'rgba(234, 139, 125, 0.25)',
             'rgba(255, 186, 73, 0.24)',
@@ -525,6 +588,7 @@
         const cacheBustToken = String(Date.now());
 
         function isAdditiveSelectModifier(event) {
+            if (mobileMultiSelectMode) return true;
             return isMacPlatform ? event.metaKey : event.ctrlKey;
         }
 
@@ -554,6 +618,12 @@
             document.getElementById('mobileRotateBtn').addEventListener('click', rotateSelectedBuilding);
             document.getElementById('mobileDeleteBtn').addEventListener('click', deleteSelectedBuildings);
             document.getElementById('mobileManualBtn').addEventListener('click', showManual);
+            document.getElementById('mobileMultiSelectBtn').addEventListener('click', () => {
+                mobileMultiSelectMode = !mobileMultiSelectMode;
+                const btn = document.getElementById('mobileMultiSelectBtn');
+                btn.classList.toggle('active', mobileMultiSelectMode);
+                btn.textContent = mobileMultiSelectMode ? '✓ 多选' : '多选';
+            });
             
             const grid = document.getElementById('grid');
             grid.style.setProperty('--cols', cols);
@@ -576,6 +646,11 @@
             // Safari on macOS exposes pinch as gesture events.
             container.addEventListener('gesturestart', onGestureStart);
             container.addEventListener('gesturechange', onGestureChange);
+            // Standard touch pinch-to-zoom for Android and iOS.
+            container.addEventListener('touchstart', onContainerTouchStart, { passive: false });
+            container.addEventListener('touchmove', onContainerTouchMove, { passive: false });
+            container.addEventListener('touchend', onContainerTouchEnd);
+            container.addEventListener('touchcancel', onContainerTouchEnd);
             window.addEventListener('keydown', onKeyPan);
             window.addEventListener('keyup', onKeyPanStop);
             window.addEventListener('blur', resetKeyPanState);
@@ -953,9 +1028,17 @@
         function updateSelectedBuildingStyles() {
             document.querySelectorAll('.placed').forEach(element => {
                 const id = Number(element.dataset.id);
+                const isBuffSource = highlightedBuffSourceIds.includes(id);
                 element.classList.toggle('selected', id === selectedBuildingId);
                 element.classList.toggle('group-selected', selectedBuildingIds.has(id) && id !== selectedBuildingId);
-                element.classList.toggle('buff-source', highlightedBuffSourceIds.includes(id));
+                element.classList.toggle('buff-source', isBuffSource);
+                if (isBuffSource && highlightedBuffLabel) {
+                    element.dataset.buffLabel = highlightedBuffLabel;
+                    element.title = highlightedBuffLabel;
+                } else {
+                    delete element.dataset.buffLabel;
+                    element.removeAttribute('title');
+                }
             });
         }
 
@@ -975,14 +1058,82 @@
         function clearBuffHighlight() {
             selectedBuffIndex = null;
             highlightedBuffSourceIds = [];
+            highlightedBuffLabel = '';
             updateSelectedBuildingStyles();
+        }
+
+        function getBuildingFootprint(building) {
+            const [width, height] = building.rot % 180 === 0
+                ? [building.w, building.h]
+                : [building.h, building.w];
+            return {
+                left: building.x * cellSize,
+                top: building.y * cellSize,
+                right: (building.x + width) * cellSize,
+                bottom: (building.y + height) * cellSize
+            };
+        }
+
+        function ensureBuildingsVisible(ids) {
+            const buildings = ids.map(id => getPlacedById(id)).filter(Boolean);
+            if (!buildings.length) return;
+
+            const bounds = buildings.reduce((acc, building) => {
+                const footprint = getBuildingFootprint(building);
+                return {
+                    left: Math.min(acc.left, footprint.left),
+                    top: Math.min(acc.top, footprint.top),
+                    right: Math.max(acc.right, footprint.right),
+                    bottom: Math.max(acc.bottom, footprint.bottom)
+                };
+            }, {
+                left: Infinity,
+                top: Infinity,
+                right: -Infinity,
+                bottom: -Infinity
+            });
+
+            const container = document.getElementById('gridContainer');
+            const padding = 48;
+            const scaledLeft = bounds.left * scale;
+            const scaledTop = bounds.top * scale;
+            const scaledRight = bounds.right * scale;
+            const scaledBottom = bounds.bottom * scale;
+            const visibleLeft = container.scrollLeft + padding;
+            const visibleTop = container.scrollTop + padding;
+            const visibleRight = container.scrollLeft + container.clientWidth - padding;
+            const visibleBottom = container.scrollTop + container.clientHeight - padding;
+            const fullyVisible = scaledLeft >= visibleLeft
+                && scaledTop >= visibleTop
+                && scaledRight <= visibleRight
+                && scaledBottom <= visibleBottom;
+
+            if (fullyVisible) return;
+
+            const targetCenterX = (scaledLeft + scaledRight) / 2;
+            const targetCenterY = (scaledTop + scaledBottom) / 2;
+            const contentWidth = cols * cellSize * scale;
+            const contentHeight = rows * cellSize * scale;
+            const maxScrollLeft = Math.max(0, contentWidth - container.clientWidth);
+            const maxScrollTop = Math.max(0, contentHeight - container.clientHeight);
+            const nextScrollLeft = Math.max(0, Math.min(maxScrollLeft, targetCenterX - container.clientWidth / 2));
+            const nextScrollTop = Math.max(0, Math.min(maxScrollTop, targetCenterY - container.clientHeight / 2));
+
+            container.scrollTo({
+                left: nextScrollLeft,
+                top: nextScrollTop,
+                behavior: 'smooth'
+            });
         }
 
         function highlightBuffSources(buffIndex) {
             const building = getSelectedBuilding();
             if (!building || !building.activeBuffs[buffIndex]) return;
+            const buff = building.activeBuffs[buffIndex];
             selectedBuffIndex = buffIndex;
-            highlightedBuffSourceIds = [...building.activeBuffs[buffIndex].sourceIds];
+            highlightedBuffSourceIds = [...buff.sourceIds];
+            highlightedBuffLabel = buff.name || `Buff ${buffIndex + 1}`;
+            ensureBuildingsVisible(highlightedBuffSourceIds);
             renderBuildingDetails(building);
         }
 
@@ -1016,7 +1167,6 @@
                 ? `<div class="buff-list">${building.activeBuffs.map((buff, index) => `
                     <div class="buff-item ${selectedBuffIndex === index ? 'active' : ''}" data-buff-index="${index}">
                         <div class="buff-item-title">${index + 1}. ${buff.name || `Buff ${index + 1}`}</div>
-                        <div class="buff-item-line">组合：${buff.builds.join(' + ')}</div>
                         <div class="buff-item-line">来源建筑：${buff.source.join(' + ')}</div>
                         <div class="buff-item-line">地价加成：+${buff.land}</div>
                         <div class="buff-item-line">商品加成：+${buff.commodity}</div>
@@ -1301,63 +1451,47 @@
                 if (e.target.closest('.placed')) {
                     return;
                 }
-
-                const startX = e.clientX;
-                const startY = e.clientY;
-                const pointerId = e.pointerId;
-                let canceled = false;
-                let longPressTriggered = false;
-
-                const onContextMenu = (ev) => { ev.preventDefault(); };
-                document.addEventListener('contextmenu', onContextMenu);
-
-                const cleanup = (keepContextMenuSuppressed = false) => {
-                    clearTimeout(longPressTimer);
-                    document.removeEventListener('pointermove', onPreMove);
-                    document.removeEventListener('pointerup', onPreUp);
-                    document.removeEventListener('pointercancel', onPreUp);
-                    if (!keepContextMenuSuppressed) {
-                        document.removeEventListener('contextmenu', onContextMenu);
-                    }
-                };
-
-                const onPreMove = (ev) => {
-                    if (ev.pointerId !== pointerId || longPressTriggered) return;
-                    const dx = Math.abs(ev.clientX - startX);
-                    const dy = Math.abs(ev.clientY - startY);
-                    if (dx > touchMoveCancelThreshold || dy > touchMoveCancelThreshold) {
-                        canceled = true;
-                        cleanup();
-                    }
-                };
-
-                const onPreUp = (ev) => {
-                    if (ev.pointerId !== pointerId || longPressTriggered) return;
-                    cleanup();
-                    if (!canceled) {
-                        clearSelectedBuilding();
-                    }
-                };
-
-                const longPressTimer = setTimeout(() => {
-                    longPressTriggered = true;
-                    cleanup(true);
-                    setTimeout(() => document.removeEventListener('contextmenu', onContextMenu), 100);
-                    startSelectionDrag(startX, startY, false, { pointerId });
-                }, touchBoxPressDelay);
-
-                document.addEventListener('pointermove', onPreMove, { passive: true });
-                document.addEventListener('pointerup', onPreUp);
-                document.addEventListener('pointercancel', onPreUp);
+                // Touch tap on empty area: clear selection (unless multi-select mode, handled by click).
                 return;
             }
             onContainerMouseDown(e);
+        }
+
+        function onContainerTouchStart(e) {
+            if (e.touches.length < 2) return;
+            e.preventDefault();
+            isPinching = true;
+            const t1 = e.touches[0], t2 = e.touches[1];
+            pinchInitialDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+            pinchInitialScale = scale;
+        }
+
+        function onContainerTouchMove(e) {
+            if (!isPinching || e.touches.length < 2) return;
+            e.preventDefault();
+            const t1 = e.touches[0], t2 = e.touches[1];
+            const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+            if (pinchInitialDist === 0) return;
+            const midX = (t1.clientX + t2.clientX) / 2;
+            const midY = (t1.clientY + t2.clientY) / 2;
+            applyScaleAtPoint(pinchInitialScale * dist / pinchInitialDist, midX, midY);
+        }
+
+        function onContainerTouchEnd(e) {
+            if (e.touches.length < 2) {
+                isPinching = false;
+            }
         }
 
         function onContainerClick(e) {
             if (e.target.closest('.placed')) return;
             if (tryPlacePendingAtClientPoint(e.clientX, e.clientY)) {
                 e.preventDefault();
+                return;
+            }
+            // Touch tap on empty area clears selection (unless multi-select mode keeps it).
+            if (!isAdditiveSelectModifier(e)) {
+                clearSelectedBuilding();
             }
         }
 
