@@ -5,26 +5,193 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>建筑布局设计工具</title>
     <style>
-        body { display: flex; flex-direction: row; margin: 0; font-family: sans-serif; height: 100vh; overflow: hidden; user-select: none; }
+        :root {
+            color-scheme: light;
+            --bg: #f3efe6;
+            --panel: rgba(255, 252, 246, 0.96);
+            --panel-strong: #fffaf0;
+            --line: #d8cdbd;
+            --text: #2d2418;
+            --muted: #6b6256;
+            --accent: #1d6b57;
+            --accent-soft: #e4f2ec;
+            --danger: #a6402a;
+            --shadow: 0 18px 40px rgba(61, 44, 24, 0.12);
+        }
+
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            display: flex;
+            flex-direction: row;
+            margin: 0;
+            font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", sans-serif;
+            height: 100dvh;
+            overflow: hidden;
+            user-select: none;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0) 32%),
+                linear-gradient(135deg, #efe4d1 0%, #f7f4ec 46%, #ece5d5 100%);
+        }
+        button, input { font: inherit; }
 
         /* prevent text selection while dragging on map */
         #mapContainer, #gridContainer, #grid, .placed { user-select: none; -webkit-user-select: none; -ms-user-select: none; }
 
+        #mobileTopbar {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(122, 103, 74, 0.15);
+            background: rgba(255, 250, 240, 0.9);
+            backdrop-filter: blur(12px);
+            position: relative;
+            z-index: 1100;
+        }
+        .mobile-title {
+            flex: 1;
+            min-width: 0;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .mobile-toggle-btn,
+        .panel-close-btn,
+        .action-button,
+        #palette button,
+        #manualCloseBtn {
+            border: 1px solid rgba(104, 82, 55, 0.18);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.82);
+            color: var(--text);
+            padding: 9px 12px;
+            cursor: pointer;
+            transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+        }
+        .mobile-toggle-btn:hover,
+        .panel-close-btn:hover,
+        .action-button:hover,
+        #palette button:hover,
+        #manualCloseBtn:hover {
+            background: #fff;
+            border-color: rgba(29, 107, 87, 0.35);
+        }
+        .action-button.danger {
+            color: var(--danger);
+            border-color: rgba(166, 64, 42, 0.2);
+        }
+        #panelBackdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(31, 23, 14, 0.28);
+            backdrop-filter: blur(2px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+            z-index: 1090;
+        }
+
         /* palette toolbar on the left */
-        #palette { flex: 0 0 200px; border-right: 1px solid #ccc; padding: 10px; box-sizing: border-box; overflow-y: auto; position: relative; }
+        #palette {
+            flex: 0 0 240px;
+            border-right: 1px solid rgba(122, 103, 74, 0.16);
+            padding: 14px;
+            overflow-y: auto;
+            position: relative;
+            background: var(--panel);
+            backdrop-filter: blur(12px);
+        }
+        .mobile-panel-header { display: none; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+        .panel-title { font-size: 15px; font-weight: 700; }
         .palette-section { margin-bottom: 10px; }
-        .palette-header { background: #ddd; padding: 5px; cursor: pointer; font-weight: bold; border-radius: 3px; user-select: none; }
-        .palette-header:hover { background: #ccc; }
+        .palette-header {
+            background: linear-gradient(135deg, #e9decf, #efe6d8);
+            padding: 8px 10px;
+            cursor: pointer;
+            font-weight: 700;
+            border-radius: 8px;
+            user-select: none;
+            border: 1px solid rgba(122, 103, 74, 0.12);
+        }
+        .palette-header:hover { background: linear-gradient(135deg, #e4d7c7, #ece1d1); }
         .palette-items.collapsed { display: none; }
-        #palette .building { margin: 5px 0; cursor: grab; border: 1px solid #999; padding: 2px; text-align: center; background: #f4f4f4; font-size: 12px; }
-        #palette .layout-item { margin: 5px 0; cursor: pointer; border: 1px solid #666; padding: 5px; text-align: center; background: #e8f4f8; font-size: 12px; border-radius: 3px; }
-        #palette .layout-item:hover { background: #d0e8f0; }
+        #palette .building {
+            margin: 6px 0;
+            cursor: grab;
+            border: 1px solid rgba(104, 82, 55, 0.18);
+            padding: 8px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.72);
+            font-size: 12px;
+            border-radius: 8px;
+            touch-action: manipulation;
+        }
+        #palette .building.pending {
+            background: var(--accent-soft);
+            border-color: rgba(29, 107, 87, 0.42);
+            color: var(--accent);
+            font-weight: 700;
+        }
+        #palette .layout-item {
+            margin: 6px 0;
+            cursor: pointer;
+            border: 1px solid rgba(58, 87, 109, 0.2);
+            padding: 8px;
+            text-align: center;
+            background: #edf4f3;
+            font-size: 12px;
+            border-radius: 8px;
+            touch-action: manipulation;
+        }
+        #palette .layout-item:hover { background: #dbeceb; }
+        .palette-action-group {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            margin: 12px 0 16px;
+        }
+        #palette h3 {
+            margin: 18px 0 10px;
+            font-size: 15px;
+        }
 
         /* container for grid */
-        #mapContainer { flex: 1; min-width: 0; position: relative; }
+        #mapContainer { flex: 1; min-width: 0; position: relative; overflow: hidden; }
         #gridContainer { width: 100%; height: 100%; overflow: auto; position: relative; }
-        #grid { position: absolute; top: 0; left: 0; background: #e5e5e5; display: grid; transform-origin: 0 0; grid-template-columns: repeat(var(--cols), 40px); grid-template-rows: repeat(var(--rows), 40px); }
-        #grid .cell { width: 40px; height: 40px; box-sizing: border-box; border: 1px solid #ccc; }
+        #grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: #dedbd3;
+            display: grid;
+            transform-origin: 0 0;
+            grid-template-columns: repeat(var(--cols), 40px);
+            grid-template-rows: repeat(var(--rows), 40px);
+            box-shadow: inset 0 0 0 1px rgba(101, 91, 78, 0.08);
+        }
+        #grid .cell { width: 40px; height: 40px; border: 1px solid rgba(255, 255, 255, 0.38); }
+        #placementHint {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 40;
+            display: none;
+            padding: 9px 14px;
+            border-radius: 999px;
+            background: rgba(29, 107, 87, 0.92);
+            color: #fff;
+            font-size: 12px;
+            box-shadow: 0 10px 24px rgba(29, 107, 87, 0.28);
+            white-space: nowrap;
+        }
 
         #crosshairLayer {
             position: absolute;
@@ -52,11 +219,26 @@
             white-space: nowrap;
         }
 
-        .placed { position: absolute; box-sizing: border-box; border: 2px solid #333; background: rgba(0,0,255,0.2); }
+        .placed {
+            position: absolute;
+            border: 2px solid rgba(43, 51, 63, 0.9);
+            background: var(--building-bg, rgba(71, 110, 165, 0.18));
+            touch-action: none;
+        }
         .placed.selected { border-color: #c62828; box-shadow: 0 0 0 2px rgba(198, 40, 40, 0.2); }
         .placed.group-selected { border-color: #ef6c00; box-shadow: 0 0 0 2px rgba(239, 108, 0, 0.2); }
         .placed.buff-source { background: rgba(46, 125, 50, 0.45); }
-        .placed .label { position: absolute; font-size: 10px; color: #000; pointer-events: none; }
+        .placed .label {
+            position: absolute;
+            inset: 0;
+            padding: 3px;
+            font-size: 10px;
+            color: #1b1b1b;
+            pointer-events: none;
+            white-space: pre-line;
+            line-height: 1.2;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0));
+        }
 
         #selectionBox {
             position: fixed;
@@ -67,18 +249,42 @@
             display: none;
         }
 
-        #detailsPanel { flex: 0 0 280px; border-left: 1px solid #ccc; padding: 12px; box-sizing: border-box; overflow-y: auto; background: #fafafa; }
+        #detailsPanel {
+            flex: 0 0 300px;
+            border-left: 1px solid rgba(122, 103, 74, 0.16);
+            padding: 14px;
+            overflow-y: auto;
+            background: var(--panel);
+            backdrop-filter: blur(12px);
+        }
         #detailsPanel h3 { margin: 0 0 12px; font-size: 16px; }
-        .details-empty { color: #666; font-size: 13px; line-height: 1.5; }
-        .details-card { border: 1px solid #ddd; border-radius: 6px; background: #fff; padding: 10px; margin-bottom: 12px; }
+        .details-empty { color: var(--muted); font-size: 13px; line-height: 1.6; }
+        .details-card { border: 1px solid rgba(122, 103, 74, 0.14); border-radius: 10px; background: #fff; padding: 12px; margin-bottom: 12px; }
         .details-card-title { font-size: 15px; font-weight: bold; margin-bottom: 8px; }
-        .details-meta { font-size: 12px; color: #444; line-height: 1.6; }
+        .details-meta { font-size: 12px; color: #4b443b; line-height: 1.7; }
         .buff-list { display: flex; flex-direction: column; gap: 8px; }
-        .buff-item { border: 1px solid #ddd; border-radius: 6px; background: #fff; padding: 10px; cursor: pointer; }
-        .buff-item:hover { border-color: #bbb; background: #f5f5f5; }
+        .buff-item { border: 1px solid rgba(122, 103, 74, 0.14); border-radius: 10px; background: #fff; padding: 10px; cursor: pointer; }
+        .buff-item:hover { border-color: rgba(29, 107, 87, 0.25); background: #fbfbf9; }
         .buff-item.active { border-color: #2e7d32; background: #edf7ee; }
         .buff-item-title { font-size: 13px; font-weight: bold; margin-bottom: 6px; }
         .buff-item-line { font-size: 12px; color: #444; line-height: 1.5; }
+
+        #mobileActionBar {
+            display: none;
+            position: absolute;
+            left: 12px;
+            right: 12px;
+            bottom: 12px;
+            z-index: 50;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 8px;
+        }
+        #mobileActionBar .action-button {
+            padding: 10px 6px;
+            font-size: 12px;
+            background: rgba(255, 250, 240, 0.96);
+            backdrop-filter: blur(12px);
+        }
 
         #manualOverlay {
             position: fixed;
@@ -105,31 +311,120 @@
         .manual-section-title { font-size: 14px; font-weight: bold; margin-bottom: 6px; }
         .manual-list { margin: 0; padding-left: 18px; color: #333; font-size: 13px; line-height: 1.6; }
         .manual-actions { display: flex; justify-content: flex-end; margin-top: 14px; }
-        #manualCloseBtn { padding: 8px 14px; border: 1px solid #999; background: #f7f7f7; border-radius: 6px; cursor: pointer; }
-        #manualCloseBtn:hover { background: #ededed; }
+
+        body.palette-open #panelBackdrop,
+        body.details-open #panelBackdrop {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        @media (max-width: 960px) {
+            body {
+                flex-direction: column;
+            }
+            #mobileTopbar {
+                display: flex;
+            }
+            #palette,
+            #detailsPanel {
+                position: fixed;
+                top: 0;
+                bottom: 0;
+                width: min(84vw, 340px);
+                max-width: 340px;
+                z-index: 1200;
+                box-shadow: var(--shadow);
+                padding-top: 18px;
+                transition: transform 0.24s ease;
+            }
+            #palette {
+                left: 0;
+                transform: translateX(-104%);
+            }
+            #detailsPanel {
+                right: 0;
+                transform: translateX(104%);
+            }
+            body.palette-open #palette {
+                transform: translateX(0);
+            }
+            body.details-open #detailsPanel {
+                transform: translateX(0);
+            }
+            .mobile-panel-header {
+                display: flex;
+            }
+            #mapContainer {
+                min-height: 0;
+                flex: 1;
+            }
+            #mobileActionBar {
+                display: grid;
+            }
+            #crosshairLayer {
+                display: none !important;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .palette-action-group {
+                grid-template-columns: 1fr;
+            }
+            #mobileActionBar {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+            #coordHud {
+                bottom: 82px;
+            }
+        }
     </style>
 </head>
 <body>
+    <div id="mobileTopbar">
+        <button id="paletteToggleBtn" class="mobile-toggle-btn" type="button">建筑</button>
+        <div class="mobile-title">建筑布局设计工具</div>
+        <button id="detailsToggleBtn" class="mobile-toggle-btn" type="button">明细</button>
+    </div>
+    <div id="panelBackdrop"></div>
     <div id="palette">
+        <div class="mobile-panel-header">
+            <div class="panel-title">建筑与布局</div>
+            <button id="paletteCloseBtn" class="panel-close-btn" type="button">关闭</button>
+        </div>
         <div class="palette-section">
             <div class="palette-header" data-type="layouts">内置布局</div>
             <div class="palette-items" id="layoutsList"></div>
         </div>
         <h3>建筑列表</h3>
-        <button id="exportBtn">导出布局</button>
-        <button id="clearBtn">清空地图</button>
         <input type="file" id="importInput" style="display:none" accept="application/json" />
-        <button id="importBtn">导入布局</button>
+        <div class="palette-action-group">
+            <button id="exportBtn" type="button">导出布局</button>
+            <button id="importBtn" type="button">导入布局</button>
+            <button id="clearBtn" type="button">清空地图</button>
+            <button id="manualOpenBtn" type="button">操作手册</button>
+        </div>
     </div>
     <div id="mapContainer">
         <div id="gridContainer"><div id="grid"></div></div>
+        <div id="placementHint"></div>
         <div id="crosshairLayer">
             <div id="crosshairX" class="crosshair-line"></div>
             <div id="crosshairY" class="crosshair-line"></div>
             <div id="coordHud">X: 0, Y: 0</div>
         </div>
+        <div id="mobileActionBar">
+            <button id="mobilePaletteBtn" class="action-button" type="button">建筑</button>
+            <button id="mobileRotateBtn" class="action-button" type="button">旋转</button>
+            <button id="mobileDeleteBtn" class="action-button danger" type="button">删除</button>
+            <button id="mobileDetailsBtn" class="action-button" type="button">明细</button>
+            <button id="mobileManualBtn" class="action-button" type="button">说明</button>
+        </div>
     </div>
     <aside id="detailsPanel">
+        <div class="mobile-panel-header">
+            <div class="panel-title">Buff 明细</div>
+            <button id="detailsCloseBtn" class="panel-close-btn" type="button">关闭</button>
+        </div>
         <h3>建筑 Buff 明细</h3>
         <div id="detailsContent" class="details-empty">点击地图中的建筑后，这里会显示该建筑当前生效的 buff 明细。</div>
     </aside>
@@ -142,6 +437,7 @@
                 <div class="manual-section-title">建筑编辑</div>
                 <ul class="manual-list">
                     <li>左侧建筑列表可拖拽到地图放置建筑。</li>
+                    <li>手机端可先点建筑，再点地图完成放置。</li>
                     <li>右键建筑可旋转。</li>
                     <li>按住左键拖动建筑可移动；拖到左侧工具栏区域可删除。</li>
                     <li>选中建筑后，按 Backspace / Delete 可删除。</li>
@@ -203,7 +499,29 @@
         let panShiftPressed = false;
         let panAnimationId = null;
         let panLastTime = 0;
+        let pendingPlacement = null;
+        const touchBoxPressDelay = 300;
+        const touchMoveCancelThreshold = 8;
+        const sizeColorPalette = [
+            'rgba(234, 139, 125, 0.25)',
+            'rgba(255, 186, 73, 0.24)',
+            'rgba(142, 194, 117, 0.24)',
+            'rgba(98, 190, 178, 0.24)',
+            'rgba(124, 163, 234, 0.24)',
+            'rgba(175, 145, 225, 0.24)',
+            'rgba(224, 145, 193, 0.24)',
+            'rgba(171, 139, 102, 0.24)'
+        ];
+        const sizeColorOverrides = {
+            '1x1': 'rgba(255, 196, 64, 0.35)',
+            '2x2': 'rgba(52, 168, 83, 0.34)',
+            '2x4': 'rgba(255, 125, 38, 0.30)',
+            '4x4': 'rgba(47, 120, 226, 0.33)',
+            '6x6': 'rgba(158, 76, 220, 0.33)',
+            '8x10': 'rgba(231, 44, 44, 0.42)'
+        };
         const isMacPlatform = /mac/i.test(navigator.platform || '');
+        const coarsePointerMedia = window.matchMedia('(hover: none), (pointer: coarse)');
         const cacheBustToken = String(Date.now());
 
         function isAdditiveSelectModifier(event) {
@@ -223,8 +541,19 @@
             // hook export/import buttons
             document.getElementById('exportBtn').addEventListener('click', exportLayout);
             document.getElementById('clearBtn').addEventListener('click', clearMap);
+            document.getElementById('manualOpenBtn').addEventListener('click', showManual);
             document.getElementById('importBtn').addEventListener('click', ()=>document.getElementById('importInput').click());
             document.getElementById('importInput').addEventListener('change', onImportFile);
+            document.getElementById('paletteToggleBtn').addEventListener('click', () => togglePanel('palette'));
+            document.getElementById('detailsToggleBtn').addEventListener('click', () => togglePanel('details'));
+            document.getElementById('paletteCloseBtn').addEventListener('click', closePanels);
+            document.getElementById('detailsCloseBtn').addEventListener('click', closePanels);
+            document.getElementById('panelBackdrop').addEventListener('click', closePanels);
+            document.getElementById('mobilePaletteBtn').addEventListener('click', () => togglePanel('palette'));
+            document.getElementById('mobileDetailsBtn').addEventListener('click', () => togglePanel('details'));
+            document.getElementById('mobileRotateBtn').addEventListener('click', rotateSelectedBuilding);
+            document.getElementById('mobileDeleteBtn').addEventListener('click', deleteSelectedBuildings);
+            document.getElementById('mobileManualBtn').addEventListener('click', showManual);
             
             const grid = document.getElementById('grid');
             grid.style.setProperty('--cols', cols);
@@ -240,18 +569,166 @@
             const container = document.getElementById('gridContainer');
             container.addEventListener('wheel', onWheel, { passive: false });
             container.addEventListener('scroll', onViewportScroll, { passive: true });
-            container.addEventListener('mousemove', onContainerMouseMove);
-            container.addEventListener('mouseleave', onContainerMouseLeave);
-            container.addEventListener('mousedown', onContainerMouseDown);
+            container.addEventListener('pointermove', onContainerPointerMove);
+            container.addEventListener('pointerleave', onContainerPointerLeave);
+            container.addEventListener('pointerdown', onContainerPointerDown);
+            container.addEventListener('click', onContainerClick);
             // Safari on macOS exposes pinch as gesture events.
             container.addEventListener('gesturestart', onGestureStart);
             container.addEventListener('gesturechange', onGestureChange);
             window.addEventListener('keydown', onKeyPan);
             window.addEventListener('keyup', onKeyPanStop);
             window.addEventListener('blur', resetKeyPanState);
+            window.addEventListener('resize', handleViewportResize);
+            if (coarsePointerMedia.addEventListener) {
+                coarsePointerMedia.addEventListener('change', handleViewportResize);
+            } else if (coarsePointerMedia.addListener) {
+                coarsePointerMedia.addListener(handleViewportResize);
+            }
             loadViewportCache();
+            updatePlacementHint();
             showManual();
             
+        }
+
+        function isMobileLayout() {
+            return window.innerWidth <= 960;
+        }
+
+        function shouldUseTapPlacement() {
+            return coarsePointerMedia.matches || isMobileLayout();
+        }
+
+        function handleViewportResize() {
+            if (!isMobileLayout()) {
+                closePanels();
+            }
+            updatePlacementHint();
+        }
+
+        function openPanel(panelName) {
+            if (panelName === 'palette') {
+                document.body.classList.add('palette-open');
+                document.body.classList.remove('details-open');
+            }
+            if (panelName === 'details') {
+                document.body.classList.add('details-open');
+                document.body.classList.remove('palette-open');
+            }
+        }
+
+        function closePanels() {
+            document.body.classList.remove('palette-open');
+            document.body.classList.remove('details-open');
+        }
+
+        function togglePanel(panelName) {
+            const className = panelName === 'palette' ? 'palette-open' : 'details-open';
+            const isOpen = document.body.classList.contains(className);
+            if (isOpen) {
+                closePanels();
+                return;
+            }
+            openPanel(panelName);
+        }
+
+        function updatePlacementHint() {
+            const hint = document.getElementById('placementHint');
+            if (!hint) return;
+            if (!pendingPlacement || !shouldUseTapPlacement()) {
+                hint.style.display = 'none';
+                hint.textContent = '';
+                return;
+            }
+            hint.style.display = 'block';
+            hint.textContent = `已选择 ${pendingPlacement.name}，点地图即可放置`;
+        }
+
+        function updatePendingBuildingStyles() {
+            document.querySelectorAll('#palette .building').forEach(element => {
+                const isActive = pendingPlacement && element.dataset.name === pendingPlacement.name;
+                element.classList.toggle('pending', Boolean(isActive));
+            });
+        }
+
+        function setPendingPlacement(building) {
+            pendingPlacement = building ? { ...building } : null;
+            updatePendingBuildingStyles();
+            updatePlacementHint();
+            if (pendingPlacement && isMobileLayout()) {
+                closePanels();
+            }
+        }
+
+        function getGridPositionFromClient(clientX, clientY) {
+            const gridRect = document.getElementById('grid').getBoundingClientRect();
+            const x = Math.floor((clientX - gridRect.left) / (cellSize * scale));
+            const y = Math.floor((clientY - gridRect.top) / (cellSize * scale));
+            if (x < 0 || y < 0 || x >= cols || y >= rows) {
+                return null;
+            }
+            return { x, y };
+        }
+
+        function tryPlacePendingAtClientPoint(clientX, clientY) {
+            if (!pendingPlacement) return false;
+            const position = getGridPositionFromClient(clientX, clientY);
+            if (!position) return false;
+            const created = placeBuilding(
+                pendingPlacement.name,
+                position.x,
+                position.y,
+                pendingPlacement.w,
+                pendingPlacement.h,
+                0
+            );
+            if (!created) return false;
+            selectBuilding(created.id);
+            setPendingPlacement(null);
+            return true;
+        }
+
+        function rotateSelectedBuilding() {
+            if (selectedBuildingId !== null) {
+                rotate(selectedBuildingId);
+            }
+        }
+
+        function deleteSelectedBuildings() {
+            if (selectedBuildingIds.size > 1) {
+                removePlacedMany(Array.from(selectedBuildingIds));
+                return;
+            }
+            if (selectedBuildingId !== null) {
+                removePlaced(selectedBuildingId);
+            }
+        }
+
+        function getSizeColorKey(w, h) {
+            const minSide = Math.min(w, h);
+            const maxSide = Math.max(w, h);
+            return `${minSide}x${maxSide}`;
+        }
+
+        function getColorFromSizeKey(sizeKey) {
+            if (sizeColorOverrides[sizeKey]) {
+                return sizeColorOverrides[sizeKey];
+            }
+            let hash = 0;
+            for (let i = 0; i < sizeKey.length; i++) {
+                hash = (hash * 31 + sizeKey.charCodeAt(i)) >>> 0;
+            }
+            return sizeColorPalette[hash % sizeColorPalette.length];
+        }
+
+        function getBuildingBaseColor(building) {
+            return getColorFromSizeKey(getSizeColorKey(building.w, building.h));
+        }
+
+        function applyBuildingBaseColor(building) {
+            const element = document.querySelector(`.placed[data-id='${building.id}']`);
+            if (!element) return;
+            element.style.setProperty('--building-bg', getBuildingBaseColor(building));
         }
 
         function loadData() {
@@ -287,6 +764,9 @@
                 div.textContent = layout.name;
                 div.addEventListener('click', () => {
                     loadLayoutFile(layout.file);
+                    if (isMobileLayout()) {
+                        closePanels();
+                    }
                 });
                 listContainer.appendChild(div);
             });
@@ -312,6 +792,7 @@
         }
 
         async function loadPlacedItems(items) {
+            setPendingPlacement(null);
             resetPlacedBuildings();
             const grid = document.getElementById('grid');
 
@@ -385,6 +866,10 @@
                     div.addEventListener('dragstart', e => {
                         e.dataTransfer.setData('text/plain', JSON.stringify({name:b.name,w:b.w,h:b.h}));
                     });
+                    div.addEventListener('click', () => {
+                        if (!shouldUseTapPlacement()) return;
+                        setPendingPlacement({ name: b.name, w: b.w, h: b.h });
+                    });
                     itemsContainer.appendChild(div);
                 });
                 
@@ -397,15 +882,16 @@
                 section.appendChild(itemsContainer);
                 pal.appendChild(section);
             });
+
+            updatePendingBuildingStyles();
         }
 
         function onDrop(e) {
             e.preventDefault();
             const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-            const gridRect = document.getElementById('grid').getBoundingClientRect();
-            const x = Math.floor((e.clientX - gridRect.left) / (cellSize * scale));
-            const y = Math.floor((e.clientY - gridRect.top) / (cellSize * scale));
-            placeBuilding(data.name, x, y, data.w, data.h, 0);
+            const position = getGridPositionFromClient(e.clientX, e.clientY);
+            if (!position) return;
+            placeBuilding(data.name, position.x, position.y, data.w, data.h, 0);
         }
 
         function placeBuilding(name, x, y, w, h, rot, options = {}) {
@@ -440,7 +926,7 @@
                 // if no space found at all
                 if (!found) {
                     alert('地图空间不足，无法放置建筑');
-                    return;
+                    return null;
                 }
             }
             
@@ -452,6 +938,7 @@
                 calculateBuffers();
                 updateCache();
             }
+            return obj;
         }
 
         function getPlacedById(id) {
@@ -571,6 +1058,7 @@
             const div = document.createElement('div');
             div.className = 'placed';
             div.dataset.id = obj.id;
+            div.style.setProperty('--building-bg', getBuildingBaseColor(obj));
             div.style.left = obj.x * cellSize + 'px';
             div.style.top = obj.y * cellSize + 'px';
             const [ww,hh] = obj.rot%180===0 ? [obj.w,obj.h] : [obj.h,obj.w];
@@ -582,8 +1070,8 @@
                 rotate(obj.id);
             });
             // dragging for movement
-            div.addEventListener('mousedown', e=>{
-                if(e.button!==0) return;
+            div.addEventListener('pointerdown', e=>{
+                if (e.pointerType === 'mouse' && e.button!==0) return;
                 e.preventDefault(); // stop text selection while dragging
                 startDrag(obj.id, e);
             });
@@ -610,6 +1098,7 @@
         let dragging = null;
         let bufferDebounceTimer = null;
         function startDrag(id, e) {
+            const pointerId = e.pointerId;
             const appendSelection = isAdditiveSelectModifier(e);
             const movingIds = selectedBuildingIds.has(id) && selectedBuildingIds.size > 1
                 ? Array.from(selectedBuildingIds)
@@ -623,7 +1112,11 @@
             const startX = e.clientX;
             const startY = e.clientY;
             let moved = false;
-            function onMouseMove(ev) {
+            function isSamePointer(ev) {
+                return pointerId === undefined || ev.pointerId === undefined || ev.pointerId === pointerId;
+            }
+            function onPointerMove(ev) {
+                if (!isSamePointer(ev)) return;
                 const dx = ev.clientX - startX;
                 const dy = ev.clientY - startY;
                 if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
@@ -662,9 +1155,11 @@
                     }
                 }
             }
-            function onMouseUp(ev) {
-                document.removeEventListener('mousemove', onMouseMove);
-                document.removeEventListener('mouseup', onMouseUp);
+            function onPointerUp(ev) {
+                if (!isSamePointer(ev)) return;
+                document.removeEventListener('pointermove', onPointerMove);
+                document.removeEventListener('pointerup', onPointerUp);
+                document.removeEventListener('pointercancel', onPointerUp);
                 if (!moved) {
                     if (appendSelection) {
                         const nextSelection = new Set(selectedBuildingIds);
@@ -692,18 +1187,15 @@
                     bufferDebounceTimer = null;
                 }, 100);
             }
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
+            document.addEventListener('pointermove', onPointerMove);
+            document.addEventListener('pointerup', onPointerUp);
+            document.addEventListener('pointercancel', onPointerUp);
         }
 
-        function onContainerMouseDown(e) {
-            if (e.button !== 0) return;
-            if (e.target.closest('.placed')) return;
-            const appendSelection = isAdditiveSelectModifier(e);
-
+        function startSelectionDrag(startX, startY, appendSelection, pointerConfig = null) {
             const selectionBox = document.getElementById('selectionBox');
-            const startX = e.clientX;
-            const startY = e.clientY;
+            const usingPointer = Boolean(pointerConfig);
+            const pointerId = pointerConfig ? pointerConfig.pointerId : null;
 
             selectionBox.style.display = 'block';
             selectionBox.style.left = `${startX}px`;
@@ -711,7 +1203,16 @@
             selectionBox.style.width = '0px';
             selectionBox.style.height = '0px';
 
-            function onMouseMove(ev) {
+            function isExpectedPointer(ev) {
+                if (!usingPointer) return true;
+                return pointerId === undefined || ev.pointerId === undefined || ev.pointerId === pointerId;
+            }
+
+            function onMove(ev) {
+                if (!isExpectedPointer(ev)) return;
+                if (usingPointer) {
+                    ev.preventDefault();
+                }
                 const x = Math.min(startX, ev.clientX);
                 const y = Math.min(startY, ev.clientY);
                 const w = Math.abs(ev.clientX - startX);
@@ -722,9 +1223,16 @@
                 selectionBox.style.height = `${h}px`;
             }
 
-            function onMouseUp(ev) {
-                document.removeEventListener('mousemove', onMouseMove);
-                document.removeEventListener('mouseup', onMouseUp);
+            function onUp(ev) {
+                if (!isExpectedPointer(ev)) return;
+                if (usingPointer) {
+                    document.removeEventListener('pointermove', onMove);
+                    document.removeEventListener('pointerup', onUp);
+                    document.removeEventListener('pointercancel', onUp);
+                } else {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                }
 
                 const x1 = Math.min(startX, ev.clientX);
                 const y1 = Math.min(startY, ev.clientY);
@@ -758,8 +1266,99 @@
                 }
             }
 
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
+            if (usingPointer) {
+                document.addEventListener('pointermove', onMove, { passive: false });
+                document.addEventListener('pointerup', onUp);
+                document.addEventListener('pointercancel', onUp);
+            } else {
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            }
+        }
+
+        function onContainerMouseDown(e) {
+            if (e.button !== 0) return;
+            if (e.target.closest('.placed')) return;
+            const appendSelection = isAdditiveSelectModifier(e);
+            startSelectionDrag(e.clientX, e.clientY, appendSelection);
+        }
+
+        function onContainerPointerMove(e) {
+            if (e.pointerType === 'touch') return;
+            onContainerMouseMove(e);
+        }
+
+        function onContainerPointerLeave(e) {
+            if (e.pointerType === 'touch') return;
+            onContainerMouseLeave();
+        }
+
+        function onContainerPointerDown(e) {
+            if (pendingPlacement && !e.target.closest('.placed')) {
+                return;
+            }
+            if (e.pointerType !== 'mouse') {
+                if (e.target.closest('.placed')) {
+                    return;
+                }
+
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const pointerId = e.pointerId;
+                let canceled = false;
+                let longPressTriggered = false;
+
+                const onContextMenu = (ev) => { ev.preventDefault(); };
+                document.addEventListener('contextmenu', onContextMenu);
+
+                const cleanup = (keepContextMenuSuppressed = false) => {
+                    clearTimeout(longPressTimer);
+                    document.removeEventListener('pointermove', onPreMove);
+                    document.removeEventListener('pointerup', onPreUp);
+                    document.removeEventListener('pointercancel', onPreUp);
+                    if (!keepContextMenuSuppressed) {
+                        document.removeEventListener('contextmenu', onContextMenu);
+                    }
+                };
+
+                const onPreMove = (ev) => {
+                    if (ev.pointerId !== pointerId || longPressTriggered) return;
+                    const dx = Math.abs(ev.clientX - startX);
+                    const dy = Math.abs(ev.clientY - startY);
+                    if (dx > touchMoveCancelThreshold || dy > touchMoveCancelThreshold) {
+                        canceled = true;
+                        cleanup();
+                    }
+                };
+
+                const onPreUp = (ev) => {
+                    if (ev.pointerId !== pointerId || longPressTriggered) return;
+                    cleanup();
+                    if (!canceled) {
+                        clearSelectedBuilding();
+                    }
+                };
+
+                const longPressTimer = setTimeout(() => {
+                    longPressTriggered = true;
+                    cleanup(true);
+                    setTimeout(() => document.removeEventListener('contextmenu', onContextMenu), 100);
+                    startSelectionDrag(startX, startY, false, { pointerId });
+                }, touchBoxPressDelay);
+
+                document.addEventListener('pointermove', onPreMove, { passive: true });
+                document.addEventListener('pointerup', onPreUp);
+                document.addEventListener('pointercancel', onPreUp);
+                return;
+            }
+            onContainerMouseDown(e);
+        }
+
+        function onContainerClick(e) {
+            if (e.target.closest('.placed')) return;
+            if (tryPlacePendingAtClientPoint(e.clientX, e.clientY)) {
+                e.preventDefault();
+            }
         }
 
         function calculateBuffers() {
@@ -1192,6 +1791,7 @@
         }
 
         function showManual() {
+            closePanels();
             const overlay = document.getElementById('manualOverlay');
             const closeBtn = document.getElementById('manualCloseBtn');
             if (!overlay || !closeBtn) return;
@@ -1298,6 +1898,7 @@
             if(!confirm('确定要清空地图吗？此操作不可撤销。')) return;
             resetPlacedBuildings();
             localStorage.removeItem('layoutCache');
+            setPendingPlacement(null);
         }
         window.onload = ()=>{ initGrid(); loadData(); };
     </script>
