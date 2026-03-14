@@ -1431,8 +1431,20 @@
                 if (!moved) {
                     if (appendSelection) {
                         const nextSelection = new Set(selectedBuildingIds);
-                        nextSelection.add(id);
-                        setSelection(Array.from(nextSelection), id);
+                        if (nextSelection.has(id)) {
+                            nextSelection.delete(id);
+                            if (!nextSelection.size) {
+                                clearSelectedBuilding();
+                            } else {
+                                const nextPrimary = selectedBuildingId === id
+                                    ? Array.from(nextSelection)[0]
+                                    : selectedBuildingId;
+                                setSelection(Array.from(nextSelection), nextPrimary);
+                            }
+                        } else {
+                            nextSelection.add(id);
+                            setSelection(Array.from(nextSelection), id);
+                        }
                     } else {
                         selectBuilding(id);
                     }
