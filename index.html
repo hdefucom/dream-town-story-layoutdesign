@@ -318,7 +318,11 @@
         .placed {
             position: absolute;
             border: 2px solid rgba(43, 51, 63, 0.9);
-            background: var(--building-bg, rgba(71, 110, 165, 0.18));
+            background-color: var(--building-bg, rgba(71, 110, 165, 0.18));
+            background-image: var(--building-overlay, none);
+            background-repeat: no-repeat;
+            background-position: 0 0;
+            background-size: 100% 100%;
             touch-action: none;
         }
         .placed.selected { border-color: #c62828; box-shadow: 0 0 0 2px rgba(198, 40, 40, 0.2); }
@@ -711,6 +715,7 @@
         let panShiftPressed = false;
         let panAnimationId = null;
         let panLastTime = 0;
+        let paletteSectionCollapsedState = {};
         let pendingPlacement = null;
         let mobileMultiSelectMode = false;
         let isPinching = false;
@@ -978,7 +983,8 @@
             try {
                 localStorage.setItem(uiPrefsCacheKey, JSON.stringify({
                     mapColorEnabled,
-                    gridLineDarkMode
+                    gridLineDarkMode,
+                    paletteSectionCollapsedState
                 }));
             } catch (e) {
                 console.warn('save ui prefs failed', e);
@@ -992,9 +998,34 @@
                 const prefs = JSON.parse(raw);
                 mapColorEnabled = Boolean(prefs.mapColorEnabled);
                 gridLineDarkMode = Boolean(prefs.gridLineDarkMode);
+                paletteSectionCollapsedState = (prefs.paletteSectionCollapsedState && typeof prefs.paletteSectionCollapsedState === 'object')
+                    ? prefs.paletteSectionCollapsedState
+                    : {};
             } catch (e) {
                 console.warn('load ui prefs failed', e);
             }
+        }
+        function getPaletteSectionStateKey(type) {
+            return String(type || '').trim();
+        }
+
+        function isPaletteSectionCollapsed(type) {
+            return Boolean(paletteSectionCollapsedState[getPaletteSectionStateKey(type)]);
+        }
+
+        function setPaletteSectionCollapsed(type, collapsed) {
+            const key = getPaletteSectionStateKey(type);
+            if (!key) return;
+            if (collapsed) {
+                paletteSectionCollapsedState[key] = true;
+            } else {
+                delete paletteSectionCollapsedState[key];
+            }
+            saveUiPrefs();
+        }
+
+        function restorePaletteSectionState(type, itemsContainer) {
+            itemsContainer.classList.toggle('collapsed', isPaletteSectionCollapsed(type));
         }
 
         function updateMapColorToggleUi() {
@@ -1376,10 +1407,45 @@
             return getColorFromSizeKey(getSizeColorKey(building.w, building.h));
         }
 
-        function applyBuildingBaseColor(building) {
-            const element = document.querySelector(`.placed[data-id='${building.id}']`);
+        function isResidentXBuilding(building) {
+            return String(building.name || '').trim() === '居民x';
+        }
+
+        function getResidentXPatternDataUrl(widthCells, heightCells) {
+            const widthPx = widthCells * cellSize;
+            const heightPx = heightCells * cellSize;
+            const gapPx = cellSize;
+            const blockPx = cellSize * 6;
+            const stepPx = blockPx + gapPx;
+            const blockFill = 'rgba(64, 140, 255, 0.72)';
+            const rects = [];
+
+            for (let top = gapPx; top + blockPx <= heightPx - gapPx + 0.001; top += stepPx) {
+                for (let left = gapPx; left + blockPx <= widthPx - gapPx + 0.001; left += stepPx) {
+                    rects.push(`<rect x="${left}" y="${top}" width="${blockPx}" height="${blockPx}" rx="10" ry="10" fill="${blockFill}" />`);
+                }
+            }
+
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}" viewBox="0 0 ${widthPx} ${heightPx}">${rects.join('')}</svg>`;
+            return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+        }
+
+        function applyBuildingVisualStyle(building, element) {
             if (!element) return;
             element.style.setProperty('--building-bg', getBuildingBaseColor(building));
+            if (isResidentXBuilding(building)) {
+                const [widthCells, heightCells] = building.rot % 180 === 0
+                    ? [building.w, building.h]
+                    : [building.h, building.w];
+                element.style.setProperty('--building-overlay', getResidentXPatternDataUrl(widthCells, heightCells));
+            } else {
+                element.style.removeProperty('--building-overlay');
+            }
+        }
+
+        function applyBuildingBaseColor(building) {
+            const element = document.querySelector(`.placed[data-id='${building.id}']`);
+            applyBuildingVisualStyle(building, element);
         }
 
         function loadData() {
@@ -1408,11 +1474,13 @@
         function populateLayouts() {
             const header = document.querySelector('.palette-header[data-type="layouts"]');
             const listContainer = document.getElementById('layoutsList');
+            restorePaletteSectionState(header.dataset.type, listContainer);
             syncPaletteHeaderState(header, listContainer);
             
             // Toggle collapse on header click
             header.addEventListener('click', () => {
                 listContainer.classList.toggle('collapsed');
+                setPaletteSectionCollapsed(header.dataset.type, listContainer.classList.contains('collapsed'));
                 syncPaletteHeaderState(header, listContainer);
             });
             
@@ -1506,7 +1574,7 @@
                 { type: '居民', name: '居民8', w: 4, h: 8 },
                 { type: '居民', name: '居民10', w: 4, h: 10 },
                 { type: '居民', name: '居民8', w: 6, h: 6 },
-                { type: '居民', name: '居民x', w: 22, h: 36 }
+                { type: '居民', name: '居民x', w: 22, h: 50 }
             ];
             const groupedBuildings = {};
             
@@ -1541,6 +1609,7 @@
                 
                 const itemsContainer = document.createElement('div');
                 itemsContainer.className = 'palette-items';
+                restorePaletteSectionState(type, itemsContainer);
                 
                 // Add buildings to this category
                 groupedBuildings[type].forEach(b => {
@@ -1564,6 +1633,7 @@
                 // Toggle collapse on header click
                 header.addEventListener('click', () => {
                     itemsContainer.classList.toggle('collapsed');
+                    setPaletteSectionCollapsed(type, itemsContainer.classList.contains('collapsed'));
                     syncPaletteHeaderState(header, itemsContainer);
                 });
                 syncPaletteHeaderState(header, itemsContainer);
@@ -1824,12 +1894,12 @@
             const div = document.createElement('div');
             div.className = 'placed';
             div.dataset.id = obj.id;
-            div.style.setProperty('--building-bg', getBuildingBaseColor(obj));
             div.style.left = obj.x * cellSize + 'px';
             div.style.top = obj.y * cellSize + 'px';
             const [ww,hh] = obj.rot%180===0 ? [obj.w,obj.h] : [obj.h,obj.w];
             div.style.width = ww * cellSize + 'px';
             div.style.height = hh * cellSize + 'px';
+            applyBuildingVisualStyle(obj, div);
             // right-click rotates
             div.addEventListener('contextmenu', e=>{
                 e.preventDefault();
@@ -1856,6 +1926,7 @@
             const [ww,hh] = obj.rot%180===0 ? [obj.w,obj.h] : [obj.h,obj.w];
             div.style.width = ww * cellSize + 'px';
             div.style.height = hh * cellSize + 'px';
+            applyBuildingVisualStyle(obj, div);
             calculateBuffers();
             updateCache();
             pushHistoryState();
