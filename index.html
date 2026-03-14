@@ -215,6 +215,20 @@
             padding: 5px 8px;
             flex: 0 0 auto;
         }
+        #mapTopControls button:disabled,
+        #mobileActionBar .action-button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            border-color: rgba(104, 82, 55, 0.14);
+            color: rgba(45, 36, 24, 0.55);
+            box-shadow: none;
+            transform: none;
+        }
+        #mapTopControls button:disabled:hover,
+        #mobileActionBar .action-button:disabled:hover {
+            background: rgba(255, 255, 255, 0.82);
+            border-color: rgba(104, 82, 55, 0.14);
+        }
         #mapTopControls button.active {
             background: var(--accent-soft);
             border-color: rgba(29, 107, 87, 0.45);
@@ -579,6 +593,8 @@
         <div id="mobileActionBar">
             <button id="mobilePaletteBtn" class="action-button" type="button">建筑</button>
             <button id="mobileRotateBtn" class="action-button" type="button">旋转</button>
+            <button id="mobileUndoBtn" class="action-button" type="button">撤销</button>
+            <button id="mobileRedoBtn" class="action-button" type="button">重做</button>
             <button id="mobileDeleteBtn" class="action-button danger" type="button">删除</button>
             <button id="mobileMultiSelectBtn" class="action-button" type="button">多选</button>
             <button id="mobileDetailsBtn" class="action-button" type="button">明细</button>
@@ -605,7 +621,17 @@
                     <li>手机端可先点建筑，再点地图完成放置。</li>
                     <li>右键建筑可旋转。</li>
                     <li>按住左键拖动建筑可移动；拖到左侧工具栏区域可删除。</li>
+                    <li>选中建筑后可用 Ctrl/Cmd + C 复制，Ctrl/Cmd + V 粘贴到附近可容纳位置。</li>
                     <li>选中建筑后，按 Backspace / Delete 可删除。</li>
+                </ul>
+            </div>
+
+            <div class="manual-section">
+                <div class="manual-section-title">工具条操作</div>
+                <ul class="manual-list">
+                    <li>顶部工具条支持导入、导出、清空和打开说明。</li>
+                    <li>地图工具支持撤销/重做、地图底色开关、网格线黑白切换和群转90°。</li>
+                    <li>撤销快捷键：Ctrl/Cmd + Z；重做快捷键：Ctrl/Cmd + Y（macOS 也支持 Cmd + Shift + Z）。</li>
                 </ul>
             </div>
 
@@ -622,9 +648,10 @@
                 <div class="manual-section-title">框选与批量操作</div>
                 <ul class="manual-list">
                     <li>在地图空白处左键拖拽可框选多个建筑。</li>
-                    <li>按住 Ctrl（Windows）/ Command（macOS）点击或框选，可在当前选择基础上追加多选。</li>
+                    <li>按住 Ctrl（Windows）/ Command（macOS）点击或框选，可在当前选择基础上追加多选；点击已选中的建筑可取消选中。</li>
                     <li>拖动已选中的任意一个建筑，可整体批量移动。</li>
                     <li>多选后按 Backspace / Delete 可批量删除。</li>
+                    <li>点击群转90°可按选中集群中心顺时针旋转，若越界或重叠会自动取消。</li>
                 </ul>
             </div>
 
@@ -634,6 +661,7 @@
                     <li>点击建筑后，右侧显示该建筑 Buff 明细。</li>
                     <li>点击右侧某条 Buff，可在地图高亮其来源建筑。</li>
                     <li>支持导入/导出布局，以及加载内置布局。</li>
+                    <li>开启地图底色后，移动/粘贴建筑会受地图约束：仅可在 100x100 范围内且只能放在白色格子。</li>
                     <li>会自动缓存地图布局、缩放系数和滚动位置。</li>
                 </ul>
             </div>
@@ -736,6 +764,8 @@
             document.getElementById('mobilePaletteBtn').addEventListener('click', () => togglePanel('palette'));
             document.getElementById('mobileDetailsBtn').addEventListener('click', () => togglePanel('details'));
             document.getElementById('mobileRotateBtn').addEventListener('click', rotateSelectedBuilding);
+            document.getElementById('mobileUndoBtn').addEventListener('click', () => undoHistory());
+            document.getElementById('mobileRedoBtn').addEventListener('click', () => redoHistory());
             document.getElementById('mobileDeleteBtn').addEventListener('click', deleteSelectedBuildings);
             document.getElementById('mobileManualBtn').addEventListener('click', showManual);
             document.getElementById('mobileMultiSelectBtn').addEventListener('click', () => {
@@ -810,11 +840,21 @@
         function updateHistoryButtons() {
             const undoBtn = document.getElementById('undoBtn');
             const redoBtn = document.getElementById('redoBtn');
+            const mobileUndoBtn = document.getElementById('mobileUndoBtn');
+            const mobileRedoBtn = document.getElementById('mobileRedoBtn');
+            const canUndo = historyIndex > 0;
+            const canRedo = historyIndex < historyStack.length - 1;
             if (undoBtn) {
-                undoBtn.disabled = historyIndex <= 0;
+                undoBtn.disabled = !canUndo;
             }
             if (redoBtn) {
-                redoBtn.disabled = historyIndex >= historyStack.length - 1;
+                redoBtn.disabled = !canRedo;
+            }
+            if (mobileUndoBtn) {
+                mobileUndoBtn.disabled = !canUndo;
+            }
+            if (mobileRedoBtn) {
+                mobileRedoBtn.disabled = !canRedo;
             }
         }
 
