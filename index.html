@@ -72,7 +72,7 @@
             border-radius: 10px;
             background: rgba(255, 255, 255, 0.82);
             color: var(--text);
-            padding: 9px 12px;
+            padding: 7px 10px;
             cursor: pointer;
             transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
         }
@@ -155,17 +155,70 @@
         .palette-action-group {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 8px;
-            margin: 12px 0 16px;
+            gap: 6px;
+            margin: 8px 0 12px;
         }
         #palette h3 {
-            margin: 18px 0 10px;
-            font-size: 15px;
+            margin: 14px 0 8px;
+            font-size: 14px;
         }
 
         /* container for grid */
-        #mapContainer { flex: 1; min-width: 0; position: relative; overflow: hidden; }
-        #gridContainer { width: 100%; height: 100%; overflow: auto; position: relative; }
+        #mapContainer {
+            flex: 1;
+            min-width: 0;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        #mapTopControls {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px;
+            margin: 8px;
+            border: 1px solid rgba(122, 103, 74, 0.16);
+            border-radius: 10px;
+            background: rgba(255, 252, 246, 0.88);
+            backdrop-filter: blur(10px);
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+        .map-top-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding-right: 6px;
+            margin-right: 4px;
+            border-right: 1px solid rgba(122, 103, 74, 0.16);
+        }
+        .map-top-group:last-child {
+            border-right: none;
+            margin-right: 0;
+            padding-right: 0;
+        }
+        .map-top-group-title {
+            font-size: 10px;
+            color: var(--muted);
+            font-weight: 700;
+            padding-right: 2px;
+        }
+        #mapTopControls button {
+            font-size: 11px;
+            line-height: 1.2;
+            padding: 5px 8px;
+            flex: 0 0 auto;
+        }
+        #gridContainer {
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            position: relative;
+            flex: 1;
+            min-height: 0;
+        }
         #grid {
             position: absolute;
             top: 0;
@@ -427,6 +480,25 @@
                 min-height: 0;
                 flex: 1;
             }
+            #mapTopControls {
+                display: flex;
+                margin: 6px 8px 4px;
+                padding: 5px;
+                gap: 5px;
+                border-radius: 8px;
+            }
+            .map-top-group {
+                gap: 4px;
+                padding-right: 5px;
+                margin-right: 3px;
+            }
+            .map-top-group-title {
+                display: none;
+            }
+            #mapTopControls button {
+                font-size: 10px;
+                padding: 4px 7px;
+            }
             #mobileActionBar {
                 display: grid;
             }
@@ -457,22 +529,29 @@
             <div class="panel-title">建筑与布局</div>
             <button id="paletteCloseBtn" class="panel-close-btn" type="button">关闭</button>
         </div>
+        <input type="file" id="importInput" style="display:none" accept="application/json" />
         <div class="palette-section">
             <div class="palette-header" data-type="layouts">内置布局</div>
             <div class="palette-items" id="layoutsList"></div>
         </div>
         <h3>建筑列表</h3>
-        <input type="file" id="importInput" style="display:none" accept="application/json" />
-        <div class="palette-action-group">
-            <button id="exportBtn" type="button">导出</button>
-            <button id="importBtn" type="button">导入</button>
-            <button id="clearBtn" type="button">清空</button>
-            <button id="manualOpenBtn" type="button">说明</button>
-            <button id="mapColorToggleBtn" type="button">地图</button>
-            <button id="gridLineToggleBtn" type="button">网格</button>
-        </div>
     </div>
     <div id="mapContainer">
+        <div id="mapTopControls">
+            <div class="map-top-group">
+                <span class="map-top-group-title">布局操作</span>
+                <button id="exportBtn" type="button">导出</button>
+                <button id="importBtn" type="button">导入</button>
+                <button id="clearBtn" type="button">清空</button>
+                <button id="manualOpenBtn" type="button">说明</button>
+            </div>
+            <div class="map-top-group">
+                <span class="map-top-group-title">地图工具</span>
+                <button id="mapColorToggleBtn" type="button">地图</button>
+                <button id="gridLineToggleBtn" type="button">网格</button>
+                <button id="rotateGroupBtn" type="button">群转90°</button>
+            </div>
+        </div>
         <div id="gridContainer"><div id="grid"></div></div>
         <div id="placementHint"></div>
         <div id="crosshairLayer">
@@ -624,6 +703,7 @@
             document.getElementById('importInput').addEventListener('change', onImportFile);
             document.getElementById('mapColorToggleBtn').addEventListener('click', toggleMapColorOverlay);
             document.getElementById('gridLineToggleBtn').addEventListener('click', toggleGridLineColor);
+            document.getElementById('rotateGroupBtn').addEventListener('click', rotateSelectedGroupClockwise);
             document.getElementById('paletteToggleBtn').addEventListener('click', () => togglePanel('palette'));
             document.getElementById('detailsToggleBtn').addEventListener('click', () => togglePanel('details'));
             document.getElementById('paletteCloseBtn').addEventListener('click', closePanels);
@@ -889,6 +969,131 @@
             if (selectedBuildingId !== null) {
                 removePlaced(selectedBuildingId);
             }
+        }
+
+        function getFootprintByState(x, y, w, h, rot) {
+            const [ww, hh] = rot % 180 === 0 ? [w, h] : [h, w];
+            return {
+                x1: x,
+                y1: y,
+                x2: x + ww,
+                y2: y + hh,
+                w: ww,
+                h: hh
+            };
+        }
+
+        function overlapsRect(a, b) {
+            return !(a.x2 <= b.x1 || b.x2 <= a.x1 || a.y2 <= b.y1 || b.y2 <= a.y1);
+        }
+
+        function rotateSelectedGroupClockwise() {
+            const selectedIds = Array.from(selectedBuildingIds);
+            if (!selectedIds.length && selectedBuildingId !== null) {
+                selectedIds.push(selectedBuildingId);
+            }
+            if (!selectedIds.length) return;
+
+            const selectedSet = new Set(selectedIds);
+            const selectedBuildings = selectedIds.map(id => getPlacedById(id)).filter(Boolean);
+            if (!selectedBuildings.length) return;
+
+            // 以选中集群外接包围盒中心为旋转原点
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+            const sourceFootprints = new Map();
+
+            selectedBuildings.forEach(building => {
+                const fp = getFootprintByState(building.x, building.y, building.w, building.h, building.rot);
+                sourceFootprints.set(building.id, fp);
+                minX = Math.min(minX, fp.x1);
+                minY = Math.min(minY, fp.y1);
+                maxX = Math.max(maxX, fp.x2);
+                maxY = Math.max(maxY, fp.y2);
+            });
+
+            const centerX = (minX + maxX) / 2;
+            const centerY = (minY + maxY) / 2;
+            const nextState = new Map();
+
+            for (const building of selectedBuildings) {
+                const oldFp = sourceFootprints.get(building.id);
+                const buildingCenterX = (oldFp.x1 + oldFp.x2) / 2;
+                const buildingCenterY = (oldFp.y1 + oldFp.y2) / 2;
+                const rotatedCenterX = centerX - (buildingCenterY - centerY);
+                const rotatedCenterY = centerY + (buildingCenterX - centerX);
+                const nextRot = (building.rot + 90) % 360;
+                const [nextW, nextH] = nextRot % 180 === 0 ? [building.w, building.h] : [building.h, building.w];
+                const nextX = Math.round(rotatedCenterX - nextW / 2);
+                const nextY = Math.round(rotatedCenterY - nextH / 2);
+                const fp = {
+                    x1: nextX,
+                    y1: nextY,
+                    x2: nextX + nextW,
+                    y2: nextY + nextH,
+                    w: nextW,
+                    h: nextH
+                };
+
+                if (fp.x1 < 0 || fp.y1 < 0 || fp.x2 > cols || fp.y2 > rows) {
+                    alert('旋转后超出地图边界，操作已取消。');
+                    return;
+                }
+
+                nextState.set(building.id, {
+                    x: nextX,
+                    y: nextY,
+                    rot: nextRot,
+                    fp
+                });
+            }
+
+            // 选中集群内部不能互相重叠
+            for (let i = 0; i < selectedBuildings.length; i++) {
+                for (let j = i + 1; j < selectedBuildings.length; j++) {
+                    const aId = selectedBuildings[i].id;
+                    const bId = selectedBuildings[j].id;
+                    const aFp = nextState.get(aId).fp;
+                    const bFp = nextState.get(bId).fp;
+                    if (overlapsRect(aFp, bFp)) {
+                        alert('旋转后选中建筑发生重叠，操作已取消。');
+                        return;
+                    }
+                }
+            }
+
+            // 不能与未选中建筑重叠
+            const staticBuildings = placed.filter(item => !selectedSet.has(item.id));
+            for (const building of selectedBuildings) {
+                const candidate = nextState.get(building.id).fp;
+                for (const other of staticBuildings) {
+                    const otherFp = getFootprintByState(other.x, other.y, other.w, other.h, other.rot);
+                    if (overlapsRect(candidate, otherFp)) {
+                        alert('旋转后与其他建筑重叠，操作已取消。');
+                        return;
+                    }
+                }
+            }
+
+            // 应用旋转结果
+            for (const building of selectedBuildings) {
+                const next = nextState.get(building.id);
+                building.x = next.x;
+                building.y = next.y;
+                building.rot = next.rot;
+                const div = document.querySelector(`.placed[data-id='${building.id}']`);
+                if (div) {
+                    div.style.left = `${building.x * cellSize}px`;
+                    div.style.top = `${building.y * cellSize}px`;
+                    div.style.width = `${next.fp.w * cellSize}px`;
+                    div.style.height = `${next.fp.h * cellSize}px`;
+                }
+            }
+
+            calculateBuffers();
+            updateCache();
         }
 
         function getSizeColorKey(w, h) {
