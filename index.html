@@ -617,6 +617,7 @@
                     <li>右键建筑可旋转。</li>
                     <li>按住左键拖动建筑可移动；拖到左侧工具栏区域可删除。</li>
                     <li>选中建筑后可用 Ctrl/Cmd + C 复制，Ctrl/Cmd + V 粘贴到附近可容纳位置。</li>
+                    <li>按 Ctrl/Cmd + A 可选中地图上的全部建筑。</li>
                     <li>选中建筑后，按 Backspace / Delete 可删除。</li>
                 </ul>
             </div>
@@ -2442,6 +2443,16 @@
                 if (pasteCopiedBuildings()) {
                     e.preventDefault();
                 }
+                return;
+            }
+            if (isClipboardModifier && key === 'a') {
+                if (placed.length) {
+                    const allIds = placed.map(item => item.id);
+                    setSelection(allIds, allIds[0]);
+                } else {
+                    clearSelectedBuilding();
+                }
+                e.preventDefault();
                 return;
             }
 
