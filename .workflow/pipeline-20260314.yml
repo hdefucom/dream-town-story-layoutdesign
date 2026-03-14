@@ -14,22 +14,20 @@ stages:
     trigger: auto
     executor: []
     steps:
-      - step: deploy@agent
-        name: deploy_agent
-        displayName: 主机部署
+      - step: shell@agent
+        name: execute_shell
+        displayName: Shell 脚本执行
+        schedulerType: DISTRIBUTED
         hostGroupID:
           ID: aliyun
           hostID:
             - 3df99a14-cda0-42b1-969e-29479b3ad4f7
-        deployArtifact:
-          - source: artifact
-            name: output
-            target: ~/gitee_go/deploy
-            artifactRepository: default
-            artifactName: output
-            artifactVersion: latest
+        scriptType: SH
         script:
-          - /www/deploy.sh
+          - '# 请在此输入您想执行的脚本'
+          - echo 'Hello Gitee!'
+          - var/www/deploy.sh
+        gitClone: false
         notify: []
         strategy:
           retry: '0'
