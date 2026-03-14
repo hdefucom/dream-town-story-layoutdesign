@@ -597,6 +597,7 @@
                 <button id="redoBtn" type="button">重做</button>
                 <button id="mapColorToggleBtn" type="button">地图</button>
                 <button id="gridLineToggleBtn" type="button">网格</button>
+                <button id="sectionLineToggleBtn" type="button">分区</button>
                 <button id="rotateGroupBtn" type="button">群转90°</button>
             </div>
         </div>
@@ -691,6 +692,7 @@
         let mapColorData = null;
         let mapColorEnabled = false;
         let gridLineDarkMode = false;
+        let sectionLineEnabled = true;
         let gridCellsCache = null;
         const placed = [];
         let scale = 1;
@@ -767,6 +769,7 @@
             document.getElementById('importInput').addEventListener('change', onImportFile);
             document.getElementById('mapColorToggleBtn').addEventListener('click', toggleMapColorOverlay);
             document.getElementById('gridLineToggleBtn').addEventListener('click', toggleGridLineColor);
+            document.getElementById('sectionLineToggleBtn').addEventListener('click', toggleSectionLines);
             document.getElementById('undoBtn').addEventListener('click', () => undoHistory());
             document.getElementById('redoBtn').addEventListener('click', () => redoHistory());
             document.getElementById('rotateGroupBtn').addEventListener('click', rotateSelectedGroupClockwise);
@@ -792,6 +795,7 @@
                 c.className = 'cell';
                 grid.appendChild(c);
             }
+            createMapSectionLinesSVG();
 
             grid.addEventListener('dragover', e => e.preventDefault());
             grid.addEventListener('drop', onDrop);
@@ -825,6 +829,7 @@
             updatePlacementHint();
             updateMapColorToggleUi();
             updateGridLineToggleUi();
+            updateSectionLineToggleUi();
             resetHistoryWithCurrentState();
             showManual();
             
@@ -984,6 +989,7 @@
                 localStorage.setItem(uiPrefsCacheKey, JSON.stringify({
                     mapColorEnabled,
                     gridLineDarkMode,
+                    sectionLineEnabled,
                     paletteSectionCollapsedState
                 }));
             } catch (e) {
@@ -998,6 +1004,7 @@
                 const prefs = JSON.parse(raw);
                 mapColorEnabled = Boolean(prefs.mapColorEnabled);
                 gridLineDarkMode = Boolean(prefs.gridLineDarkMode);
+                sectionLineEnabled = prefs.sectionLineEnabled !== undefined ? Boolean(prefs.sectionLineEnabled) : true;
                 paletteSectionCollapsedState = (prefs.paletteSectionCollapsedState && typeof prefs.paletteSectionCollapsedState === 'object')
                     ? prefs.paletteSectionCollapsedState
                     : {};
@@ -1075,6 +1082,55 @@
             return true;
         }
 
+        function createMapSectionLinesSVG() {
+            const ns = 'http://www.w3.org/2000/svg';
+            const mapPx = 100 * cellSize; // 4000px
+            const svg = document.createElementNS(ns, 'svg');
+            svg.id = 'mapSectionLines';
+            svg.setAttribute('width', mapPx);
+            svg.setAttribute('height', mapPx);
+            svg.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:5;display:none;overflow:visible;';
+            for (let i = 1; i <= 4; i++) {
+                const pos = i * 20 * cellSize;
+                // vertical line
+                const vl = document.createElementNS(ns, 'line');
+                vl.setAttribute('x1', pos); vl.setAttribute('y1', 0);
+                vl.setAttribute('x2', pos); vl.setAttribute('y2', mapPx);
+                vl.setAttribute('stroke', 'red');
+                vl.setAttribute('stroke-width', '4');
+                vl.setAttribute('stroke-dasharray', '16 8');
+                svg.appendChild(vl);
+                // horizontal line
+                const hl = document.createElementNS(ns, 'line');
+                hl.setAttribute('x1', 0); hl.setAttribute('y1', pos);
+                hl.setAttribute('x2', mapPx); hl.setAttribute('y2', pos);
+                hl.setAttribute('stroke', 'red');
+                hl.setAttribute('stroke-width', '4');
+                hl.setAttribute('stroke-dasharray', '16 8');
+                svg.appendChild(hl);
+            }
+            document.getElementById('grid').appendChild(svg);
+        }
+
+        function updateMapSectionLines() {
+            const svg = document.getElementById('mapSectionLines');
+            if (svg) svg.style.display = (mapColorEnabled && sectionLineEnabled) ? 'block' : 'none';
+        }
+
+        function updateSectionLineToggleUi() {
+            const button = document.getElementById('sectionLineToggleBtn');
+            if (!button) return;
+            button.classList.toggle('active', sectionLineEnabled);
+            button.textContent = `分区：${sectionLineEnabled ? '开' : '关'}`;
+        }
+
+        function toggleSectionLines() {
+            sectionLineEnabled = !sectionLineEnabled;
+            updateSectionLineToggleUi();
+            updateMapSectionLines();
+            saveUiPrefs();
+        }
+
         function applyMapColorOverlay() {
             if (!gridCellsCache || gridCellsCache.length !== cols * rows) {
                 gridCellsCache = Array.from(document.querySelectorAll('#grid .cell'));
@@ -1094,6 +1150,7 @@
                     cell.style.backgroundColor = color || '';
                 }
             }
+            updateMapSectionLines();
         }
 
         function toggleMapColorOverlay() {
