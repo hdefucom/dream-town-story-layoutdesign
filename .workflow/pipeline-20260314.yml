@@ -1,0 +1,10 @@
+version: '1.0'
+name: pipeline-20260314
+displayName: pipeline-20260314
+triggers:
+  trigger: auto
+  push:
+    branches:
+      prefix:
+        - ''
+stages: []
