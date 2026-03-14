@@ -122,6 +122,19 @@
             border: 1px solid rgba(122, 103, 74, 0.12);
             font-size: 12px;
             line-height: 1.15;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .palette-header::after {
+            content: '▾';
+            color: var(--muted);
+            font-size: 11px;
+            line-height: 1;
+        }
+        .palette-header.is-collapsed::after {
+            content: '▸';
         }
         .palette-header:hover { background: linear-gradient(135deg, #e4d7c7, #ece1d1); }
         .palette-items.collapsed { display: none; }
@@ -1354,6 +1367,9 @@
         }
 
         function getBuildingBaseColor(building) {
+            if (String(building.name || '').trim().startsWith('居民')) {
+                return 'rgba(56, 58, 62, 0.62)';
+            }
             if (Number(building.w) === 1 && Number(building.h) === 1) {
                 return getOneByOneNameColor(building.name);
             }
@@ -1392,10 +1408,12 @@
         function populateLayouts() {
             const header = document.querySelector('.palette-header[data-type="layouts"]');
             const listContainer = document.getElementById('layoutsList');
+            syncPaletteHeaderState(header, listContainer);
             
             // Toggle collapse on header click
             header.addEventListener('click', () => {
                 listContainer.classList.toggle('collapsed');
+                syncPaletteHeaderState(header, listContainer);
             });
             
             // Populate layout items
@@ -1430,6 +1448,12 @@
 
         function nextFrame() {
             return new Promise(resolve => requestAnimationFrame(resolve));
+        }
+
+        function syncPaletteHeaderState(header, itemsContainer) {
+            const collapsed = itemsContainer.classList.contains('collapsed');
+            header.classList.toggle('is-collapsed', collapsed);
+            header.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
         }
 
         async function loadPlacedItems(items, options = {}) {
@@ -1476,7 +1500,14 @@
                     }
                 }catch{};
             });
-            const typeNames = { '设备': '设备', '产业1': '产业1', '产业2': '产业2' };
+            const typeNames = { '设备': '设备', '产业1': '产业1', '产业2': '产业2', '居民': '居民' };
+            const fixedResidentBuildings = [
+                { type: '居民', name: '居民1', w: 2, h: 2 },
+                { type: '居民', name: '居民8', w: 4, h: 8 },
+                { type: '居民', name: '居民10', w: 4, h: 10 },
+                { type: '居民', name: '居民8', w: 6, h: 6 },
+                { type: '居民', name: '居民x', w: 22, h: 36 }
+            ];
             const groupedBuildings = {};
             
             // Group buildings by type
@@ -1487,9 +1518,19 @@
                 }
                 groupedBuildings[type].push(b);
             });
+
+            // Keep the resident category fixed regardless of build.json contents.
+            groupedBuildings['居民'] = fixedResidentBuildings;
             
             // Create sections for each type
-            Object.keys(groupedBuildings).sort().forEach(type => {
+            const preferredOrder = ['产业1', '产业2', '设备', '居民'];
+            const orderedTypes = [
+                ...preferredOrder.filter(type => groupedBuildings[type]),
+                ...Object.keys(groupedBuildings)
+                    .filter(type => !preferredOrder.includes(type))
+                    .sort()
+            ];
+            orderedTypes.forEach(type => {
                 const section = document.createElement('div');
                 section.className = 'palette-section';
                 
@@ -1523,7 +1564,9 @@
                 // Toggle collapse on header click
                 header.addEventListener('click', () => {
                     itemsContainer.classList.toggle('collapsed');
+                    syncPaletteHeaderState(header, itemsContainer);
                 });
+                syncPaletteHeaderState(header, itemsContainer);
                 
                 section.appendChild(header);
                 section.appendChild(itemsContainer);
