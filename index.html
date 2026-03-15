@@ -63,6 +63,32 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
+        .mobile-topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .mobile-gitee-link {
+            display: none;
+            width: 34px;
+            height: 34px;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(104, 82, 55, 0.18);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.82);
+            text-decoration: none;
+            transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+        }
+        .mobile-gitee-link:hover {
+            background: #fff;
+            border-color: rgba(184, 48, 36, 0.35);
+        }
+        .mobile-gitee-link img {
+            width: 22px;
+            height: 22px;
+            display: block;
+        }
         .mobile-toggle-btn,
         .panel-close-btn,
         .action-button,
@@ -108,6 +134,31 @@
             position: relative;
             background: var(--panel);
             backdrop-filter: blur(12px);
+        }
+        .palette-link-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .gitee-link {
+            width: auto;
+            height: auto;
+            border: none;
+            background: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            transition: transform 0.2s ease, filter 0.2s ease;
+        }
+        .gitee-link:hover {
+            transform: translateY(-1px);
+            filter: drop-shadow(0 4px 10px rgba(120, 34, 34, 0.24));
+        }
+        .gitee-link img {
+            width: 30px;
+            height: auto;
+            display: block;
         }
         .mobile-panel-header { display: none; align-items: center; justify-content: space-between; margin-bottom: 14px; }
         .panel-title { font-size: 15px; font-weight: 700; }
@@ -553,6 +604,12 @@
             #mobileTopbar {
                 display: flex;
             }
+            .palette-link-row {
+                display: none;
+            }
+            .mobile-gitee-link {
+                display: inline-flex;
+            }
             #palette,
             #detailsPanel {
                 position: fixed;
@@ -627,13 +684,37 @@
     <div id="mobileTopbar">
         <button id="paletteToggleBtn" class="mobile-toggle-btn" type="button">建筑</button>
         <div class="mobile-title">建筑布局设计工具</div>
-        <button id="detailsToggleBtn" class="mobile-toggle-btn" type="button">明细</button>
+        <div class="mobile-topbar-actions">
+            <a
+                class="mobile-gitee-link"
+                href="https://gitee.com/hdefucom/dream-town-story-layoutdesign"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="打开 Gitee 仓库"
+                aria-label="打开 Gitee 仓库"
+            >
+                <img src="https://gitee.com/hdefucom/dream-town-story-layoutdesign/widgets/widget_5.svg" alt="Fork me on Gitee" />
+            </a>
+            <button id="detailsToggleBtn" class="mobile-toggle-btn" type="button">明细</button>
+        </div>
     </div>
     <div id="panelBackdrop"></div>
     <div id="palette">
         <div class="mobile-panel-header">
             <div class="panel-title">建筑与布局</div>
             <button id="paletteCloseBtn" class="panel-close-btn" type="button">关闭</button>
+        </div>
+        <div class="palette-link-row">
+            <a
+                class="gitee-link"
+                href="https://gitee.com/hdefucom/dream-town-story-layoutdesign"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="打开 Gitee 仓库"
+                aria-label="打开 Gitee 仓库"
+            >
+                <img src="https://gitee.com/hdefucom/dream-town-story-layoutdesign/widgets/widget_5.svg" alt="Fork me on Gitee" />
+            </a>
         </div>
         <input type="file" id="importInput" style="display:none" accept="application/json" />
         <div class="palette-section">
