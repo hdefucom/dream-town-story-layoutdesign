@@ -436,6 +436,33 @@
             background-size: 100% 100%;
             touch-action: none;
         }
+        .placed.special-star::before {
+            content: '★';
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            z-index: 5;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            border: 1px solid rgba(133, 84, 0, 0.95);
+            background: radial-gradient(circle at 32% 30%, #fff4a8 0%, #ffd85a 38%, #f1b713 72%, #cf8d00 100%);
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 1;
+            color: #8c4f00;
+            text-shadow:
+                0 1px 0 rgba(255, 247, 195, 0.95),
+                0 0 8px rgba(255, 235, 146, 0.82);
+            box-shadow:
+                0 0 0 1px rgba(255, 246, 192, 0.78) inset,
+                0 3px 8px rgba(120, 74, 0, 0.38),
+                0 0 12px rgba(255, 206, 71, 0.72);
+            pointer-events: none;
+        }
         .placed.selected { border-color: #c62828; box-shadow: 0 0 0 2px rgba(198, 40, 40, 0.2); }
         .placed.group-selected {
             border-color: #e65100;
@@ -995,6 +1022,7 @@
                 <button id="gridLineToggleBtn" type="button">网格</button>
                 <button id="sectionLineToggleBtn" type="button">分区</button>
                 <button id="sameHighlightToggleBtn" type="button">高亮相同</button>
+                <button id="starredBuildingToggleBtn" type="button">限定</button>
                 <button id="rotateGroupBtn" type="button">群转90°</button>
                 <button id="mirrorGroupBtn" type="button">镜像</button>
                 <button id="statsBtn" type="button">统计</button>
@@ -1140,6 +1168,21 @@
         let isPinching = false;
         let pinchInitialDist = 0;
         let pinchInitialScale = 1;
+        let starredBuildingEnabled = true;
+        const starredBuildingNames = new Set([
+            '诊所',
+            '体育用品商店',
+            '赛马场',
+            '天文馆',
+            '建材市场',
+            '运动场',
+            '全年滑雪场',
+            '高尔夫球场',
+            '狩猎公园',
+            '高尔夫练习场',
+            '室外泳池',
+            '喷泉广场'
+        ].map(normalizeBuildingName));
         const sizeColorPalette = [
             'rgba(234, 139, 125, 0.25)',
             'rgba(255, 186, 73, 0.24)',
@@ -1185,6 +1228,7 @@
             document.getElementById('manualOpenBtn').addEventListener('click', showManual);
             document.getElementById('importBtn').addEventListener('click', ()=>document.getElementById('importInput').click());
             document.getElementById('importInput').addEventListener('change', onImportFile);
+            document.getElementById('starredBuildingToggleBtn').addEventListener('click', toggleStarredBuildingVisibility);
             document.getElementById('mapColorToggleBtn').addEventListener('click', toggleMapColorOverlay);
             document.getElementById('gridLineToggleBtn').addEventListener('click', toggleGridLineColor);
             document.getElementById('sectionLineToggleBtn').addEventListener('click', toggleSectionLines);
@@ -1262,6 +1306,7 @@
             applyGridLineColor();
             loadViewportCache();
             updatePlacementHint();
+            updateStarredBuildingToggleUi();
             updateMapColorToggleUi();
             updateGridLineToggleUi();
             updateSectionLineToggleUi();
@@ -1428,6 +1473,7 @@
                     mapColorEnabled,
                     gridLineDarkMode,
                     sectionLineEnabled,
+                    starredBuildingEnabled,
                     sameHighlightEnabled,
                     paletteSectionCollapsedState
                 }));
@@ -1444,6 +1490,7 @@
                 mapColorEnabled = Boolean(prefs.mapColorEnabled);
                 gridLineDarkMode = Boolean(prefs.gridLineDarkMode);
                 sectionLineEnabled = prefs.sectionLineEnabled !== undefined ? Boolean(prefs.sectionLineEnabled) : true;
+                starredBuildingEnabled = prefs.starredBuildingEnabled !== undefined ? Boolean(prefs.starredBuildingEnabled) : true;
                 sameHighlightEnabled = prefs.sameHighlightEnabled !== undefined ? Boolean(prefs.sameHighlightEnabled) : false;
                 paletteSectionCollapsedState = (prefs.paletteSectionCollapsedState && typeof prefs.paletteSectionCollapsedState === 'object')
                     ? prefs.paletteSectionCollapsedState
@@ -1732,6 +1779,28 @@
             if (!button) return;
             button.classList.toggle('active', sectionLineEnabled);
             button.textContent = `分区：${sectionLineEnabled ? '开' : '关'}`;
+        }
+
+        function updateStarredBuildingToggleUi() {
+            const button = document.getElementById('starredBuildingToggleBtn');
+            if (!button) return;
+            button.classList.toggle('active', starredBuildingEnabled);
+            button.textContent = `限定：${starredBuildingEnabled ? '开' : '关'}`;
+        }
+
+        function refreshStarredBuildingVisibility() {
+            document.querySelectorAll('.placed').forEach(element => {
+                const id = Number(element.dataset.id);
+                const building = getPlacedById(id);
+                element.classList.toggle('special-star', shouldShowStarBadge(building));
+            });
+        }
+
+        function toggleStarredBuildingVisibility() {
+            starredBuildingEnabled = !starredBuildingEnabled;
+            updateStarredBuildingToggleUi();
+            refreshStarredBuildingVisibility();
+            saveUiPrefs();
         }
 
         function toggleSectionLines() {
@@ -2738,9 +2807,21 @@
             setSelection([]);
         }
 
+        function isStarMarkedBuilding(buildingOrName) {
+            const name = typeof buildingOrName === 'string'
+                ? buildingOrName
+                : buildingOrName && buildingOrName.name;
+            return starredBuildingNames.has(normalizeBuildingName(name));
+        }
+
+        function shouldShowStarBadge(buildingOrName) {
+            return starredBuildingEnabled && isStarMarkedBuilding(buildingOrName);
+        }
+
         function renderBuilding(obj, renderTarget = null) {
             const div = document.createElement('div');
             div.className = 'placed';
+            div.classList.toggle('special-star', shouldShowStarBadge(obj));
             div.dataset.id = obj.id;
             div.style.left = obj.x * cellSize + 'px';
             div.style.top = obj.y * cellSize + 'px';
@@ -3982,6 +4063,51 @@
             });
         }
 
+        function drawExportStarBadge(ctx, left, top, width, height) {
+            const badgeSize = Math.max(18, Math.min(30, Math.round(Math.min(width, height) * 0.42)));
+            const radius = badgeSize / 2;
+            const padding = Math.max(5, Math.round(badgeSize * 0.16));
+            const centerX = left + width - padding - radius;
+            const centerY = top + padding + radius;
+            const fontSize = Math.max(12, Math.round(badgeSize * 0.66));
+
+            ctx.save();
+            const gradient = ctx.createRadialGradient(
+                centerX - radius * 0.35,
+                centerY - radius * 0.35,
+                radius * 0.15,
+                centerX,
+                centerY,
+                radius
+            );
+            gradient.addColorStop(0, '#fff4a8');
+            gradient.addColorStop(0.38, '#ffd85a');
+            gradient.addColorStop(0.72, '#f1b713');
+            gradient.addColorStop(1, '#cf8d00');
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.shadowColor = 'rgba(255, 206, 71, 0.72)';
+            ctx.shadowBlur = Math.max(4, badgeSize * 0.32);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.lineWidth = Math.max(1.2, badgeSize * 0.07);
+            ctx.strokeStyle = 'rgba(133, 84, 0, 0.98)';
+            ctx.stroke();
+
+            ctx.font = `700 ${fontSize}px "Noto Sans SC", "PingFang SC", sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = Math.max(1.4, fontSize * 0.11);
+            ctx.strokeStyle = 'rgba(255, 248, 208, 0.98)';
+            ctx.fillStyle = '#8c4f00';
+            ctx.strokeText('★', centerX, centerY + fontSize * 0.03);
+            ctx.fillText('★', centerX, centerY + fontSize * 0.03);
+            ctx.restore();
+        }
+
         function formatExportTimestamp() {
             const d = new Date();
             const pad = (v) => String(v).padStart(2, '0');
@@ -4104,6 +4230,9 @@
                 ctx.strokeStyle = 'rgba(43, 51, 63, 0.90)';
                 ctx.lineWidth = 2;
                 ctx.strokeRect(left, top, width, height);
+                if (shouldShowStarBadge(building)) {
+                    drawExportStarBadge(ctx, left, top, width, height);
+                }
 
                 const labelText = `${building.name}\n+${building.landBuff}L +${building.commodityBuff}C`;
                 ctx.fillStyle = 'rgba(27, 27, 27, 0.92)';
