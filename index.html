@@ -647,6 +647,7 @@
             <div class="map-top-group">
                 <span class="map-top-group-title">布局操作</span>
                 <button id="exportBtn" type="button">导出</button>
+                <button id="exportImageBtn" type="button">导出图片</button>
                 <button id="importBtn" type="button">导入</button>
                 <button id="clearBtn" type="button">清空</button>
                 <button id="manualOpenBtn" type="button">说明</button>
@@ -706,6 +707,7 @@
                 <div class="manual-section-title">工具条操作</div>
                 <ul class="manual-list">
                     <li>顶部工具条支持导入、导出、清空和打开说明。</li>
+                    <li>支持导出图片：地图开启时导出100x100区域，地图关闭时导出整个地图，并在顶部留白显示水印信息。</li>
                     <li>地图工具支持撤销/重做、地图底色开关、网格线黑白切换、群转90°和镜像。</li>
                     <li>撤销快捷键：Ctrl/Cmd + Z；重做快捷键：Ctrl/Cmd + Y（macOS 也支持 Cmd + Shift + Z）。</li>
                 </ul>
@@ -825,6 +827,7 @@
         function initGrid() {
             // hook export/import buttons
             document.getElementById('exportBtn').addEventListener('click', exportLayout);
+            document.getElementById('exportImageBtn').addEventListener('click', exportMapImage);
             document.getElementById('clearBtn').addEventListener('click', clearMap);
             document.getElementById('manualOpenBtn').addEventListener('click', showManual);
             document.getElementById('importBtn').addEventListener('click', ()=>document.getElementById('importInput').click());
@@ -3333,6 +3336,207 @@
             a.href=url; a.download='layout.json'; a.click();
             URL.revokeObjectURL(url);
         }
+
+        function getExportCellRange() {
+            if (mapColorEnabled) {
+                const gridInfo = (mapColorData && mapColorData.grid) || {};
+                const mapCols = Number(gridInfo.cols) || 100;
+                const mapRows = Number(gridInfo.rows) || 100;
+                return {
+                    exportCols: Math.min(cols, mapCols),
+                    exportRows: Math.min(rows, mapRows),
+                    scope: '100x100'
+                };
+            }
+            return {
+                exportCols: cols,
+                exportRows: rows,
+                scope: 'full'
+            };
+        }
+
+        function drawMultilineText(ctx, text, x, y, maxWidth, lineHeight) {
+            const source = String(text || '');
+            const lines = [];
+            source.split('\n').forEach(rawLine => {
+                let current = '';
+                for (const ch of rawLine) {
+                    const test = current + ch;
+                    if (ctx.measureText(test).width > maxWidth && current) {
+                        lines.push(current);
+                        current = ch;
+                    } else {
+                        current = test;
+                    }
+                }
+                lines.push(current || '');
+            });
+
+            lines.forEach((line, index) => {
+                ctx.fillText(line, x, y + index * lineHeight);
+            });
+        }
+
+        function formatExportTimestamp() {
+            const d = new Date();
+            const pad = (v) => String(v).padStart(2, '0');
+            return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+        }
+
+        function exportMapImage() {
+            const customTitleInput = prompt('请输入导出图片顶部标题：', '箱庭都市布局导出图');
+            if (customTitleInput === null) {
+                return;
+            }
+            const exportTitle = String(customTitleInput).trim() || '箱庭都市布局导出图';
+
+            const { exportCols, exportRows, scope } = getExportCellRange();
+            const mapWidth = exportCols * cellSize;
+            const mapHeight = exportRows * cellSize;
+
+            const marginLeftRight = 96;
+            const marginTop = 140;
+            const marginBottom = 96;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = mapWidth + marginLeftRight * 2;
+            canvas.height = mapHeight + marginTop + marginBottom;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                alert('导出失败：当前浏览器不支持 canvas。');
+                return;
+            }
+
+            const originX = marginLeftRight;
+            const originY = marginTop;
+
+            // paper background and border frame
+            ctx.fillStyle = '#fdfaf3';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#efe8da';
+            ctx.fillRect(originX - 8, originY - 8, mapWidth + 16, mapHeight + 16);
+
+            // map base cells
+            if (mapColorEnabled) {
+                for (let y = 0; y < exportRows; y++) {
+                    for (let x = 0; x < exportCols; x++) {
+                        const color = getMapColorForCell(x, y) || '#dedbd3';
+                        ctx.fillStyle = color;
+                        ctx.fillRect(originX + x * cellSize, originY + y * cellSize, cellSize, cellSize);
+                    }
+                }
+            } else {
+                ctx.fillStyle = '#dedbd3';
+                ctx.fillRect(originX, originY, mapWidth, mapHeight);
+            }
+
+            // section lines for 100x100 map mode
+            if (mapColorEnabled && sectionLineEnabled) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(232, 41, 41, 0.92)';
+                ctx.lineWidth = 4;
+                ctx.setLineDash([16, 8]);
+                for (let i = 1; i <= 4; i++) {
+                    const pos = i * 20 * cellSize;
+                    if (pos < mapWidth) {
+                        ctx.beginPath();
+                        ctx.moveTo(originX + pos, originY);
+                        ctx.lineTo(originX + pos, originY + mapHeight);
+                        ctx.stroke();
+                    }
+                    if (pos < mapHeight) {
+                        ctx.beginPath();
+                        ctx.moveTo(originX, originY + pos);
+                        ctx.lineTo(originX + mapWidth, originY + pos);
+                        ctx.stroke();
+                    }
+                }
+                ctx.restore();
+            }
+
+            // grid lines
+            ctx.strokeStyle = gridLineDarkMode ? 'rgba(24, 24, 24, 0.34)' : 'rgba(255, 255, 255, 0.50)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([]);
+            for (let x = 0; x <= exportCols; x++) {
+                const px = originX + x * cellSize;
+                ctx.beginPath();
+                ctx.moveTo(px + 0.5, originY);
+                ctx.lineTo(px + 0.5, originY + mapHeight);
+                ctx.stroke();
+            }
+            for (let y = 0; y <= exportRows; y++) {
+                const py = originY + y * cellSize;
+                ctx.beginPath();
+                ctx.moveTo(originX, py + 0.5);
+                ctx.lineTo(originX + mapWidth, py + 0.5);
+                ctx.stroke();
+            }
+
+            // buildings
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(originX, originY, mapWidth, mapHeight);
+            ctx.clip();
+
+            placed.forEach(building => {
+                const [ww, hh] = building.rot % 180 === 0 ? [building.w, building.h] : [building.h, building.w];
+                const left = originX + building.x * cellSize;
+                const top = originY + building.y * cellSize;
+                const width = ww * cellSize;
+                const height = hh * cellSize;
+
+                // Skip buildings fully out of current export range.
+                if (left >= originX + mapWidth || top >= originY + mapHeight || left + width <= originX || top + height <= originY) {
+                    return;
+                }
+
+                ctx.fillStyle = getBuildingBaseColor(building);
+                ctx.fillRect(left, top, width, height);
+                ctx.strokeStyle = 'rgba(43, 51, 63, 0.90)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(left, top, width, height);
+
+                const labelText = `${building.name}\n+${building.landBuff}L +${building.commodityBuff}C`;
+                ctx.fillStyle = 'rgba(27, 27, 27, 0.92)';
+                ctx.font = 'bold 14px "Noto Sans SC", "PingFang SC", sans-serif';
+                drawMultilineText(ctx, labelText, left + 6, top + 18, Math.max(0, width - 12), 16);
+            });
+
+            ctx.restore();
+
+            // watermark in top margin
+            const currentUrl = String(window.location && window.location.href ? window.location.href : '').trim() || '本地页面';
+            const sourceUrl = 'https://gitee.com/hdefucom/dream-town-story-layoutdesign';
+            const watermark = '《箱庭都市布局设计工具》- 德芙';
+            const subtitle = mapColorEnabled
+                ? '导出范围：地图开启，100x100 区域'
+                : '导出范围：地图关闭，整个地图';
+
+            ctx.fillStyle = '#4c4539';
+            ctx.font = '700 30px "Noto Sans SC", "PingFang SC", sans-serif';
+            ctx.fillText(exportTitle, originX, 52);
+            ctx.font = '500 17px "Noto Sans SC", "PingFang SC", sans-serif';
+            ctx.fillText(`URL: ${currentUrl}`, originX, 80);
+            ctx.fillText(`源码：${sourceUrl}`, originX, 102);
+            ctx.fillText(watermark, originX, 124);
+            ctx.fillText(subtitle, originX + mapWidth - ctx.measureText(subtitle).width, 124);
+
+            const stamp = formatExportTimestamp();
+            canvas.toBlob((blob) => {
+                if (!blob) {
+                    alert('导出失败：生成图片数据失败。');
+                    return;
+                }
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `layout_${scope}_${stamp}.png`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }, 'image/png');
+        }
+
         function onImportFile(e){
             const file=e.target.files[0];
             if(!file) return;
