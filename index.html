@@ -1805,6 +1805,9 @@
             if (normalized.includes('铜杯像')) {
                 return 'rgba(201, 132, 58, 0.52)';
             }
+            if (normalized.endsWith('雕像')) {
+                return 'rgba(96, 88, 80, 0.50)';
+            }
             if (normalized.endsWith('像')) {
                 return 'rgba(242, 56, 52, 0.60)';
             }
@@ -1812,7 +1815,11 @@
         }
 
         function getBuildingBaseColor(building) {
-            if (String(building.name || '').trim().startsWith('居民')) {
+            const normalizedName = String(building.name || '').trim();
+            if (normalizedName === '办公室' || normalizedName === '高层办公楼') {
+                return 'rgba(24, 96, 255, 0.70)';
+            }
+            if (normalizedName.startsWith('居民')) {
                 return 'rgba(56, 58, 62, 0.62)';
             }
             if (Number(building.w) === 1 && Number(building.h) === 1) {
