@@ -3906,8 +3906,11 @@
             const data = placed.map(p=>({name:p.name,x:p.x,y:p.y,w:p.w,h:p.h,rot:p.rot}));
             const blob=new Blob([JSON.stringify(data, null, 2)],{type:'application/json'});
             const url=URL.createObjectURL(blob);
+            const d = new Date();
+            const pad = (v) => String(v).padStart(2, '0');
+            const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
             const a=document.createElement('a');
-            a.href=url; a.download='layout.json'; a.click();
+            a.href=url; a.download=`箱庭都市布局-${stamp}.json`; a.click();
             URL.revokeObjectURL(url);
         }
 
@@ -3963,6 +3966,9 @@
                 return;
             }
             const exportTitle = String(customTitleInput).trim() || '箱庭都市布局导出图';
+            const exportFileName = exportTitle
+                .replace(/[\\/:*?"<>|]/g, '_')
+                .trim() || '箱庭都市布局导出图';
 
             const { exportCols, exportRows, scope } = getExportCellRange();
             const mapWidth = exportCols * cellSize;
@@ -4096,7 +4102,6 @@
             ctx.fillText(watermark, originX, 124);
             ctx.fillText(subtitle, originX + mapWidth - ctx.measureText(subtitle).width, 124);
 
-            const stamp = formatExportTimestamp();
             canvas.toBlob((blob) => {
                 if (!blob) {
                     alert('导出失败：生成图片数据失败。');
@@ -4105,7 +4110,7 @@
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `layout_${scope}_${stamp}.png`;
+                a.download = `箱庭都市布局图-${exportFileName}.png`;
                 a.click();
                 URL.revokeObjectURL(url);
             }, 'image/png');
