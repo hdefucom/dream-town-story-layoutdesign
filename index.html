@@ -437,7 +437,34 @@
             touch-action: none;
         }
         .placed.selected { border-color: #c62828; box-shadow: 0 0 0 2px rgba(198, 40, 40, 0.2); }
-        .placed.group-selected { border-color: #ef6c00; box-shadow: 0 0 0 2px rgba(239, 108, 0, 0.2); }
+        .placed.group-selected {
+            border-color: #e65100;
+            outline: 2px solid #ffd54f;
+            outline-offset: -2px;
+            box-shadow:
+                0 0 0 3px rgba(255, 255, 255, 0.92),
+                0 0 0 7px rgba(230, 81, 0, 0.78),
+                0 0 16px 5px rgba(255, 167, 38, 0.62),
+                0 8px 16px rgba(230, 81, 0, 0.28);
+            z-index: 3;
+            animation: group-selected-pulse 1.3s ease-in-out infinite;
+        }
+        @keyframes group-selected-pulse {
+            0%, 100% {
+                box-shadow:
+                    0 0 0 3px rgba(255, 255, 255, 0.92),
+                    0 0 0 7px rgba(230, 81, 0, 0.78),
+                    0 0 16px 5px rgba(255, 167, 38, 0.62),
+                    0 8px 16px rgba(230, 81, 0, 0.28);
+            }
+            50% {
+                box-shadow:
+                    0 0 0 3px rgba(255, 255, 255, 1),
+                    0 0 0 9px rgba(230, 81, 0, 0.9),
+                    0 0 22px 8px rgba(255, 167, 38, 0.82),
+                    0 10px 20px rgba(230, 81, 0, 0.38);
+            }
+        }
         .placed.same-highlight-peer {
             border-color: #0d47a1 !important;
             outline: 2px solid #40c4ff;
@@ -2494,8 +2521,9 @@
                 const isBuffSource = highlightedBuffSourceIds.includes(id);
                 const isSameHighlight = highlightedSameBuildingIds.includes(id);
                 const isSelected = id === selectedBuildingId;
+                const hasMultiSelection = selectedBuildingIds.size > 1;
                 element.classList.toggle('selected', isSelected);
-                element.classList.toggle('group-selected', selectedBuildingIds.has(id) && id !== selectedBuildingId);
+                element.classList.toggle('group-selected', selectedBuildingIds.has(id) && hasMultiSelection);
                 element.classList.toggle('same-highlight-current', isSameHighlight && isSelected);
                 element.classList.toggle('same-highlight-peer', isSameHighlight && !isSelected);
                 element.classList.toggle('buff-source', isBuffSource);
