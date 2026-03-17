@@ -957,6 +957,34 @@
             padding: 16px;
             box-sizing: border-box;
         }
+        #buffDataOverlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+        #buffDataTable {
+            table-layout: auto;
+            min-width: unset;
+        }
+        #buffDataTable tbody td:nth-child(2) {
+            white-space: normal;
+            word-break: break-all;
+        }
+        #buffDataDialog {
+            width: min(1280px, calc(100vw - 32px));
+            max-height: calc(100vh - 48px);
+            overflow: auto;
+            background: #fff;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2);
+            padding: 16px;
+            box-sizing: border-box;
+        }
         .base-data-header {
             position: sticky;
             top: -16px;
@@ -1283,6 +1311,7 @@
             <div class="palette-header">基础数据</div>
             <div class="palette-items">
                 <button id="openBaseDataBtn" type="button" class="base-data-open-btn">建筑数据</button>
+                <button id="openBuffDataBtn" type="button" class="base-data-open-btn">专业街</button>
             </div>
         </div>
         <h3>建筑列表</h3>
@@ -1414,6 +1443,35 @@
             </div>
         </div>
     </div>
+    <div id="buffDataOverlay" role="dialog" aria-modal="true" aria-labelledby="buffDataTitle">
+        <div id="buffDataDialog">
+            <div class="base-data-header">
+                <div id="buffDataTitle" class="base-data-title">专业街 Buff 数据</div>
+                <button id="buffDataCloseBtn" type="button">关闭</button>
+            </div>
+            <div id="buffDataTotal" class="base-data-total">共 0 条</div>
+            <div class="base-data-table-wrap">
+                <table class="base-data-table" id="buffDataTable">
+                    <colgroup>
+                        <col />
+                        <col />
+                        <col />
+                        <col />
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th data-buff-sort-key="name">专业街</th>
+                            <th data-buff-sort-key="builds">建筑</th>
+                            <th data-buff-sort-key="land">地价加成</th>
+                            <th data-buff-sort-key="commodity">商品价格加成</th>
+                        </tr>
+                    </thead>
+                    <tbody id="buffDataTableBody"></tbody>
+                </table>
+                <div id="buffDataEmpty" class="base-data-table-empty" style="display:none;">暂无数据。</div>
+            </div>
+        </div>
+    </div>
     <div id="baseDataOverlay" role="dialog" aria-modal="true" aria-labelledby="baseDataTitle">
         <div id="baseDataDialog">
             <div class="base-data-header">
@@ -1496,6 +1554,8 @@
         let manualVisible = false;
         let statsVisible = false;
         let baseDataVisible = false;
+        let buffDataVisible = false;
+        let buffDataSortState = { key: '', direction: 'asc' };
         let baseDataSortState = { key: '', direction: 'asc' };
         let statsCollapsedGroups = new Set();
         let hoverClientX = null;
@@ -1594,6 +1654,7 @@
             document.getElementById('mirrorGroupBtn').addEventListener('click', mirrorSelectedGroupVertically);
             document.getElementById('statsBtn').addEventListener('click', showStats);
             document.getElementById('openBaseDataBtn').addEventListener('click', showBaseData);
+            document.getElementById('openBuffDataBtn').addEventListener('click', showBuffData);
             document.getElementById('pathCreateRoadBtn').addEventListener('click', createRoadFromShortestPath);
             document.getElementById('paletteToggleBtn').addEventListener('click', () => togglePanel('palette'));
             document.getElementById('detailsToggleBtn').addEventListener('click', () => togglePanel('details'));
@@ -1604,6 +1665,7 @@
             document.getElementById('mobileDeleteBtn').addEventListener('click', deleteSelectedBuildings);
             document.getElementById('statsCloseBtn').addEventListener('click', closeStats);
             document.getElementById('baseDataCloseBtn').addEventListener('click', closeBaseData);
+            document.getElementById('buffDataCloseBtn').addEventListener('click', closeBuffData);
             document.getElementById('statsOverlay').addEventListener('click', (event) => {
                 if (event.target === document.getElementById('statsOverlay')) {
                     closeStats();
@@ -1613,6 +1675,29 @@
                 if (event.target === document.getElementById('baseDataOverlay')) {
                     closeBaseData();
                 }
+            });
+            document.getElementById('buffDataOverlay').addEventListener('click', (event) => {
+                if (event.target === document.getElementById('buffDataOverlay')) {
+                    closeBuffData();
+                }
+            });
+            document.querySelector('#buffDataTable thead').addEventListener('click', (event) => {
+                const th = event.target.closest('th[data-buff-sort-key]');
+                if (!th) return;
+                const key = String(th.dataset.buffSortKey || '').trim();
+                if (!key) return;
+                if (buffDataSortState.key === key) {
+                    if (buffDataSortState.direction === 'asc') {
+                        buffDataSortState.direction = 'desc';
+                    } else {
+                        buffDataSortState.key = '';
+                        buffDataSortState.direction = 'asc';
+                    }
+                } else {
+                    buffDataSortState.key = key;
+                    buffDataSortState.direction = 'asc';
+                }
+                renderBuffDataTable();
             });
             document.querySelector('#baseDataDialog thead').addEventListener('click', (event) => {
                 const th = event.target.closest('th[data-sort-key]');
@@ -4332,11 +4417,15 @@
                 return;
             }
 
-            if ((manualVisible || statsVisible || baseDataVisible) && e.key !== 'Escape') {
+            if ((manualVisible || statsVisible || baseDataVisible || buffDataVisible) && e.key !== 'Escape') {
                 return;
             }
 
             if (e.key === 'Escape') {
+                if (buffDataVisible) {
+                    closeBuffData();
+                    return;
+                }
                 if (baseDataVisible) {
                     closeBaseData();
                     return;
@@ -4764,6 +4853,86 @@
             baseDataVisible = false;
         }
 
+        function getSortedBuffDataRows() {
+            const rows = [...buffData];
+            const key = String(buffDataSortState.key || '').trim();
+            if (!key) return rows;
+            const direction = buffDataSortState.direction === 'desc' ? -1 : 1;
+            rows.sort((a, b) => {
+                let av = a[key], bv = b[key];
+                if (key === 'builds') {
+                    av = Array.isArray(av) ? av.join('') : String(av ?? '');
+                    bv = Array.isArray(bv) ? bv.join('') : String(bv ?? '');
+                }
+                const aEmpty = av === null || av === undefined || String(av).trim() === '';
+                const bEmpty = bv === null || bv === undefined || String(bv).trim() === '';
+                if (aEmpty && bEmpty) return 0;
+                if (aEmpty) return 1;
+                if (bEmpty) return -1;
+                const aNum = typeof av === 'number' ? av : Number(av);
+                const bNum = typeof bv === 'number' ? bv : Number(bv);
+                if (Number.isFinite(aNum) && Number.isFinite(bNum)) return (aNum - bNum) * direction;
+                return String(av).localeCompare(String(bv), 'zh-Hans-CN', { numeric: true, sensitivity: 'base' }) * direction;
+            });
+            return rows;
+        }
+
+        function updateBuffDataSortHeaderState() {
+            document.querySelectorAll('#buffDataTable thead th[data-buff-sort-key]').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+                if (String(th.dataset.buffSortKey || '') !== buffDataSortState.key) return;
+                th.classList.add(buffDataSortState.direction === 'desc' ? 'sort-desc' : 'sort-asc');
+            });
+        }
+
+        function renderBuffDataTable() {
+            const totalEl = document.getElementById('buffDataTotal');
+            const tbody = document.getElementById('buffDataTableBody');
+            const emptyEl = document.getElementById('buffDataEmpty');
+            if (!totalEl || !tbody || !emptyEl) return;
+            totalEl.textContent = `共 ${buffData.length} 条`;
+            if (!buffData.length) {
+                tbody.innerHTML = '';
+                emptyEl.style.display = 'block';
+                updateBuffDataSortHeaderState();
+                return;
+            }
+            emptyEl.style.display = 'none';
+            const rows = getSortedBuffDataRows();
+            tbody.innerHTML = rows.map(item => {
+                const builds = Array.isArray(item.builds) ? item.builds.join(' + ') : String(item.builds ?? '');
+                const land = item.land !== undefined && item.land !== null ? String(item.land) : '';
+                const commodity = item.commodity !== undefined && item.commodity !== null ? String(item.commodity) : '';
+                return `<tr>
+                    <td>${escapeHtml(String(item.name ?? ''))}</td>
+                    <td style="text-align:left">${escapeHtml(builds)}</td>
+                    <td>${escapeHtml(land)}</td>
+                    <td>${escapeHtml(commodity)}</td>
+                </tr>`;
+            }).join('');
+            updateBuffDataSortHeaderState();
+        }
+
+        function showBuffData() {
+            clearSameBuildingHighlight();
+            closePanels();
+            closeManual();
+            closeStats();
+            closeBaseData();
+            const overlay = document.getElementById('buffDataOverlay');
+            if (!overlay) return;
+            renderBuffDataTable();
+            overlay.style.display = 'flex';
+            buffDataVisible = true;
+        }
+
+        function closeBuffData() {
+            const overlay = document.getElementById('buffDataOverlay');
+            if (!overlay) return;
+            overlay.style.display = 'none';
+            buffDataVisible = false;
+        }
+
         function normalizeBuildingName(value) {
             return String(value || '').normalize('NFKC').trim();
         }
@@ -4917,6 +5086,7 @@
             clearSameBuildingHighlight();
             closePanels();
             closeBaseData();
+            closeBuffData();
             const overlay = document.getElementById('statsOverlay');
             if (!overlay) return;
             renderStats();
