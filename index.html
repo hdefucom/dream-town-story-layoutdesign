@@ -3458,7 +3458,7 @@
         }
 
         function onContainerPointerDown(e) {
-            if (e.pointerType === 'mouse' && roadPaintEnabled && !e.target.closest('.placed')) {
+            if (roadPaintEnabled && !e.target.closest('.placed')) {
                 startRoadPaintSession(e);
                 return;
             }
@@ -3530,7 +3530,7 @@
         }
 
         function startRoadPaintSession(e) {
-            if (e.button !== 0) return;
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
             const startPosition = getGridPositionFromClient(e.clientX, e.clientY);
             if (!startPosition || isCellCoveredByBuilding(startPosition.x, startPosition.y)) {
                 return;
@@ -3558,7 +3558,7 @@
                 if (roadPaintSession && event.pointerId !== undefined && roadPaintSession.pointerId !== undefined && event.pointerId !== roadPaintSession.pointerId) {
                     return;
                 }
-                if (!(event.buttons & 1)) return;
+                if (event.pointerType === 'mouse' && !(event.buttons & 1)) return;
                 paintCurrentPoint(event);
             };
 
