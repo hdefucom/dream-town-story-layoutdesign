@@ -696,7 +696,40 @@
         #detailsPanel h3 { margin: 0 0 12px; font-size: 16px; }
         .details-empty { color: var(--muted); font-size: 13px; line-height: 1.6; }
         .details-card { border: 1px solid rgba(122, 103, 74, 0.14); border-radius: 10px; background: #fff; padding: 12px; margin-bottom: 12px; }
-        .details-card-title { font-size: 15px; font-weight: bold; margin-bottom: 8px; }
+        .details-card-title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .details-card-title { font-size: 15px; font-weight: bold; margin: 0; }
+        .details-title-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .details-color-btn {
+            width: 22px;
+            height: 22px;
+            border-radius: 999px;
+            border: 2px solid rgba(255, 255, 255, 0.92);
+            box-shadow: 0 2px 6px rgba(28, 30, 34, 0.18);
+            background: var(--details-color-btn, #7b8aa0);
+            cursor: pointer;
+            padding: 0;
+        }
+        .details-color-btn:hover {
+            transform: scale(1.06);
+        }
+        .details-color-input {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+            pointer-events: none;
+        }
         .details-meta { font-size: 12px; color: #4b443b; line-height: 1.7; }
         .buff-list { display: flex; flex-direction: column; gap: 8px; }
         .buff-item { border: 1px solid rgba(122, 103, 74, 0.14); border-radius: 10px; background: #fff; padding: 10px; cursor: pointer; }
@@ -1414,7 +1447,8 @@
                     y: item.y,
                     w: item.w,
                     h: item.h,
-                    rot: item.rot
+                    rot: item.rot,
+                    customColor: item.customColor || null
                 })),
                 roads: serializeRoadCells(),
                 nextPlacedId,
@@ -1499,7 +1533,8 @@
                     const created = placeBuilding(item.name, item.x, item.y, item.w, item.h, item.rot, {
                         skipRefresh: true,
                         resolveOccupied: false,
-                        renderTarget: fragment
+                        renderTarget: fragment,
+                        customColor: item.customColor || null
                     });
                     if (created) {
                         nextPlacedId = Math.max(nextPlacedId, created.id + 1);
@@ -1731,7 +1766,7 @@
         function buildLayoutPayload() {
             return {
                 version: 2,
-                placed: placed.map(p => ({ name: p.name, x: p.x, y: p.y, w: p.w, h: p.h, rot: p.rot })),
+                placed: placed.map(p => ({ name: p.name, x: p.x, y: p.y, w: p.w, h: p.h, rot: p.rot, customColor: p.customColor || null })),
                 roads: serializeRoadCells()
             };
         }
@@ -2552,6 +2587,9 @@
         }
 
         function getBuildingBaseColor(building) {
+            if (building && building.customColor) {
+                return building.customColor;
+            }
             const normalizedName = String(building.name || '').trim();
             if (normalizedName === '办公室' || normalizedName === '高层办公楼') {
                 return 'rgba(24, 96, 255, 0.70)';
@@ -2650,6 +2688,47 @@
             applyBuildingVisualStyle(building, element);
         }
 
+        function colorToHex(color, fallback = '#7b8aa0') {
+            const normalized = String(color || '').trim();
+            if (/^#[0-9a-fA-F]{6}$/.test(normalized)) return normalized;
+            const match = normalized.match(/^rgba?\(([^)]+)\)$/i);
+            if (!match) return fallback;
+            const parts = match[1].split(',').slice(0, 3).map(part => Number.parseInt(part, 10));
+            if (parts.length !== 3 || parts.some(part => Number.isNaN(part))) return fallback;
+            return `#${parts.map(part => Math.max(0, Math.min(255, part)).toString(16).padStart(2, '0')).join('')}`;
+        }
+
+        function updateDetailsColorControls(building) {
+            const detailsContent = document.getElementById('detailsContent');
+            if (!detailsContent || !building || selectedBuildingId !== building.id) return;
+            const colorButton = detailsContent.querySelector('.details-color-btn');
+            const colorInput = detailsContent.querySelector('.details-color-input');
+            const nextColor = getBuildingBaseColor(building);
+            if (colorButton) {
+                colorButton.style.setProperty('--details-color-btn', nextColor);
+            }
+            if (colorInput) {
+                colorInput.value = colorToHex(nextColor);
+            }
+        }
+
+        function setBuildingCustomColor(building, color, options = {}) {
+            if (!building) return;
+            const { recordHistory = true, refreshDetails = true } = options;
+            const nextColor = String(color || '').trim();
+            building.customColor = nextColor || null;
+            applyBuildingBaseColor(building);
+            if (refreshDetails) {
+                renderBuildingDetails(building);
+            } else {
+                updateDetailsColorControls(building);
+            }
+            updateCache();
+            if (recordHistory) {
+                pushHistoryState();
+            }
+        }
+
         function loadData() {
             fetchJsonNoCache('build.json').then(data=>{
                 buildData = data;
@@ -2741,7 +2820,8 @@
                     placeBuilding(item.name, item.x, item.y, item.w, item.h, item.rot, {
                         skipRefresh: true,
                         resolveOccupied: false,
-                        renderTarget: fragment
+                        renderTarget: fragment,
+                        customColor: item.customColor || null
                     });
                 });
                 grid.appendChild(fragment);
@@ -2861,7 +2941,7 @@
         }
 
         function placeBuilding(name, x, y, w, h, rot, options = {}) {
-            const { skipRefresh = false, resolveOccupied = true, renderTarget = null } = options;
+            const { skipRefresh = false, resolveOccupied = true, renderTarget = null, customColor = null } = options;
             clearSameBuildingHighlight();
             // try to place at the given position
             let finalX = x, finalY = y;
@@ -2898,7 +2978,7 @@
             }
             
             const id = nextPlacedId++;
-            const obj = {id, name, x: finalX, y: finalY, w, h, rot, landBuff: 0, commodityBuff: 0, activeBuffs: []};
+            const obj = {id, name, x: finalX, y: finalY, w, h, rot, customColor, landBuff: 0, commodityBuff: 0, activeBuffs: []};
             clearRoadCellsUnderFootprint(finalX, finalY, w, h, rot);
             placed.push(obj);
             renderBuilding(obj, renderTarget);
@@ -3114,7 +3194,13 @@
             detailsContent.className = '';
             detailsContent.innerHTML = `
                 <div class="details-card">
-                    <div class="details-card-title">${building.name}</div>
+                    <div class="details-card-title-row">
+                        <div class="details-card-title">${building.name}</div>
+                        <div class="details-title-actions">
+                            <button class="details-color-btn" type="button" title="自定义背景颜色" style="--details-color-btn: ${getBuildingBaseColor(building)}"></button>
+                            <input class="details-color-input" type="color" value="${colorToHex(getBuildingBaseColor(building))}" aria-label="选择建筑背景颜色">
+                        </div>
+                    </div>
                     <div class="details-meta">坐标：(${building.x}, ${building.y})</div>
                     <div class="details-meta">尺寸：${building.w} x ${building.h}</div>
                     <div class="details-meta">旋转：${building.rot}°</div>
@@ -3130,6 +3216,19 @@
                     highlightBuffSources(Number(element.dataset.buffIndex));
                 });
             });
+            const colorButton = detailsContent.querySelector('.details-color-btn');
+            const colorInput = detailsContent.querySelector('.details-color-input');
+            if (colorButton && colorInput) {
+                colorButton.addEventListener('click', () => {
+                    colorInput.click();
+                });
+                colorInput.addEventListener('input', () => {
+                    setBuildingCustomColor(building, colorInput.value, { recordHistory: false, refreshDetails: false });
+                });
+                colorInput.addEventListener('change', () => {
+                    setBuildingCustomColor(building, colorInput.value, { refreshDetails: false });
+                });
+            }
             updateSelectedBuildingStyles();
         }
 
