@@ -405,7 +405,7 @@
         #shortestPathLayer {
             position: absolute;
             inset: 0;
-            pointer-events: none;
+            pointer-events: auto;
             z-index: 6;
         }
         .shortest-path-cell {
@@ -415,6 +415,7 @@
             border: 2px solid rgba(245, 0, 0, 0.98);
             background: rgba(255, 24, 24, 0.32);
             box-shadow: inset 0 0 0 1px rgba(255, 186, 186, 0.35);
+            pointer-events: none;
         }
         .shortest-path-cell.start,
         .shortest-path-cell.end {
@@ -434,6 +435,26 @@
             transform-origin: 0 50%;
             transform: translate(-50%, -50%) rotate(0deg);
             filter: drop-shadow(0 0 2px rgba(120, 0, 0, 0.75));
+            pointer-events: none;
+        }
+        .shortest-path-end-action {
+            position: absolute;
+            transform: translate(-50%, -120%);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            border-radius: 999px;
+            background: rgba(28, 28, 28, 0.84);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.2;
+            padding: 6px 14px;
+            cursor: pointer;
+            white-space: nowrap;
+            pointer-events: auto;
+            box-shadow: 0 6px 14px rgba(0, 0, 0, 0.28);
+        }
+        .shortest-path-end-action:hover {
+            background: rgba(12, 12, 12, 0.9);
         }
         .shortest-path-arrow.dir-right {
             transform: translate(-50%, -50%) rotate(0deg);
@@ -1849,6 +1870,20 @@
                 fragment.appendChild(marker);
             });
             layer.appendChild(fragment);
+
+            const endCell = pathCells[pathCells.length - 1];
+            const endActionBtn = document.createElement('button');
+            endActionBtn.type = 'button';
+            endActionBtn.className = 'shortest-path-end-action';
+            endActionBtn.textContent = '创建道路';
+            endActionBtn.style.left = `${(endCell.x + 0.5) * cellSize}px`;
+            endActionBtn.style.top = `${endCell.y * cellSize}px`;
+            endActionBtn.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                createRoadFromShortestPath();
+            });
+            layer.appendChild(endActionBtn);
 
             const steps = Math.max(0, pathCells.length - 1);
             if (hudText) {
