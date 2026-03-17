@@ -374,16 +374,33 @@
             position: absolute;
             left: 10px;
             bottom: 38px;
-            padding: 3px 8px;
+            padding: 4px 8px;
             border-radius: 4px;
             background: rgba(160, 24, 24, 0.78);
             color: #fff;
             font-size: 12px;
             letter-spacing: 0.2px;
-            white-space: nowrap;
             z-index: 35;
             display: none;
-            pointer-events: none;
+            pointer-events: auto;
+            align-items: center;
+            gap: 8px;
+        }
+        #pathHudText {
+            white-space: nowrap;
+        }
+        #pathCreateRoadBtn {
+            border: 1px solid rgba(255, 255, 255, 0.32);
+            border-radius: 4px;
+            background: rgba(32, 32, 32, 0.72);
+            color: #fff;
+            font-size: 11px;
+            line-height: 1.2;
+            padding: 2px 8px;
+            cursor: pointer;
+        }
+        #pathCreateRoadBtn:hover {
+            background: rgba(18, 18, 18, 0.82);
         }
         #shortestPathLayer {
             position: absolute;
@@ -1042,7 +1059,10 @@
         </div>
         <div id="gridContainer"><div id="grid"></div></div>
         <div id="placementHint"></div>
-        <div id="pathHud"></div>
+        <div id="pathHud">
+            <span id="pathHudText"></span>
+            <button id="pathCreateRoadBtn" type="button">创建道路</button>
+        </div>
         <div id="crosshairLayer">
             <div id="crosshairX" class="crosshair-line"></div>
             <div id="crosshairY" class="crosshair-line"></div>
@@ -1149,6 +1169,7 @@
         let gridCellsCache = null;
         const placed = [];
         const roadCells = new Set();
+        let shortestPathCellsCache = [];
         let scale = 1;
         let selectedBuildingId = null;
         let selectedBuildingIds = new Set();
@@ -1257,6 +1278,7 @@
             document.getElementById('rotateGroupBtn').addEventListener('click', rotateSelectedGroupClockwise);
             document.getElementById('mirrorGroupBtn').addEventListener('click', mirrorSelectedGroupVertically);
             document.getElementById('statsBtn').addEventListener('click', showStats);
+            document.getElementById('pathCreateRoadBtn').addEventListener('click', createRoadFromShortestPath);
             document.getElementById('paletteToggleBtn').addEventListener('click', () => togglePanel('palette'));
             document.getElementById('detailsToggleBtn').addEventListener('click', () => togglePanel('details'));
             document.getElementById('paletteCloseBtn').addEventListener('click', closePanels);
@@ -1760,20 +1782,42 @@
             if (layer) {
                 layer.innerHTML = '';
             }
+            shortestPathCellsCache = [];
             const hud = document.getElementById('pathHud');
+            const hudText = document.getElementById('pathHudText');
             if (hud) {
                 hud.style.display = 'none';
-                hud.textContent = '';
             }
+            if (hudText) {
+                hudText.textContent = '';
+            }
+        }
+
+        function createRoadFromShortestPath() {
+            if (!Array.isArray(shortestPathCellsCache) || !shortestPathCellsCache.length) {
+                return;
+            }
+            let changed = false;
+            shortestPathCellsCache.forEach(cell => {
+                changed = paintRoadCell(cell.x, cell.y) || changed;
+            });
+            if (!changed) {
+                return;
+            }
+            updateCache();
+            pushHistoryState();
         }
 
         function renderShortestPath(pathCells) {
             const layer = document.getElementById('shortestPathLayer');
             const hud = document.getElementById('pathHud');
+            const hudText = document.getElementById('pathHudText');
             if (!layer || !hud || !Array.isArray(pathCells) || !pathCells.length) {
                 clearShortestPathDisplay();
                 return;
             }
+
+            shortestPathCellsCache = pathCells.map(cell => ({ x: cell.x, y: cell.y }));
 
             layer.innerHTML = '';
             const fragment = document.createDocumentFragment();
@@ -1807,8 +1851,10 @@
             layer.appendChild(fragment);
 
             const steps = Math.max(0, pathCells.length - 1);
-            hud.textContent = `路径：${pathCells.length} 格（${steps} 步）`;
-            hud.style.display = 'block';
+            if (hudText) {
+                hudText.textContent = `路径：${pathCells.length} 格（${steps} 步）`;
+            }
+            hud.style.display = 'flex';
         }
 
         function buildPathBlockedMap() {
