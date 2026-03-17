@@ -41,6 +41,9 @@
 
         /* prevent text selection while dragging on map */
         #mapContainer, #gridContainer, #grid, .placed { user-select: none; -webkit-user-select: none; -ms-user-select: none; }
+        body.road-paint-enabled #gridContainer {
+            cursor: crosshair;
+        }
 
         #mobileTopbar {
             display: none;
@@ -1031,6 +1034,7 @@
                 <button id="sectionLineToggleBtn" type="button">分区</button>
                 <button id="sameHighlightToggleBtn" type="button">高亮相同</button>
                 <button id="starredBuildingToggleBtn" type="button">限定</button>
+                <button id="roadPaintToggleBtn" type="button">道路</button>
                 <button id="rotateGroupBtn" type="button">群转90°</button>
                 <button id="mirrorGroupBtn" type="button">镜像</button>
                 <button id="statsBtn" type="button">统计</button>
@@ -1144,6 +1148,7 @@
         let sectionLineEnabled = true;
         let gridCellsCache = null;
         const placed = [];
+        const roadCells = new Set();
         let scale = 1;
         let selectedBuildingId = null;
         let selectedBuildingIds = new Set();
@@ -1177,6 +1182,11 @@
         let pinchInitialDist = 0;
         let pinchInitialScale = 1;
         let starredBuildingEnabled = true;
+        let roadPaintEnabled = false;
+        let roadPaintSession = null;
+        let suppressNextContainerClick = false;
+        const roadCellFillColor = 'rgba(74, 78, 84, 0.92)';
+        const roadCellExportColor = '#4a4e54';
         const starredBuildingNames = new Set([
             '诊所',
             '体育用品商店',
@@ -1243,6 +1253,7 @@
             document.getElementById('sameHighlightToggleBtn').addEventListener('click', toggleSameHighlightMode);
             document.getElementById('undoBtn').addEventListener('click', () => undoHistory());
             document.getElementById('redoBtn').addEventListener('click', () => redoHistory());
+            document.getElementById('roadPaintToggleBtn').addEventListener('click', toggleRoadPaintMode);
             document.getElementById('rotateGroupBtn').addEventListener('click', rotateSelectedGroupClockwise);
             document.getElementById('mirrorGroupBtn').addEventListener('click', mirrorSelectedGroupVertically);
             document.getElementById('statsBtn').addEventListener('click', showStats);
@@ -1319,6 +1330,7 @@
             updateGridLineToggleUi();
             updateSectionLineToggleUi();
             updateSameHighlightToggleUi();
+            updateRoadPaintToggleUi();
             resetHistoryWithCurrentState();
             showManual();
             
@@ -1334,6 +1346,7 @@
                     h: item.h,
                     rot: item.rot
                 })),
+                roads: serializeRoadCells(),
                 nextPlacedId,
                 selectedIds: Array.from(selectedBuildingIds),
                 primarySelectedId: selectedBuildingId
@@ -1405,6 +1418,7 @@
             isApplyingHistory = true;
             try {
                 placed.splice(0, placed.length);
+                roadCells.clear();
                 nextPlacedId = 0;
                 document.querySelectorAll('.placed').forEach(element => element.remove());
 
@@ -1422,6 +1436,7 @@
                     }
                 });
                 grid.appendChild(fragment);
+                replaceRoadCells(state.roads, { redraw: false });
 
                 const selectedIds = Array.isArray(state.selectedIds) ? state.selectedIds : [];
                 const validSelectedIds = selectedIds.filter(id => placed.some(item => item.id === id));
@@ -1435,6 +1450,7 @@
                     clearSelectedBuilding();
                 }
 
+                applyMapColorOverlay();
                 calculateBuffers();
                 updateCache();
             } finally {
@@ -1482,6 +1498,7 @@
                     gridLineDarkMode,
                     sectionLineEnabled,
                     starredBuildingEnabled,
+                    roadPaintEnabled,
                     sameHighlightEnabled,
                     paletteSectionCollapsedState
                 }));
@@ -1499,6 +1516,7 @@
                 gridLineDarkMode = Boolean(prefs.gridLineDarkMode);
                 sectionLineEnabled = prefs.sectionLineEnabled !== undefined ? Boolean(prefs.sectionLineEnabled) : true;
                 starredBuildingEnabled = prefs.starredBuildingEnabled !== undefined ? Boolean(prefs.starredBuildingEnabled) : true;
+                roadPaintEnabled = prefs.roadPaintEnabled !== undefined ? Boolean(prefs.roadPaintEnabled) : false;
                 sameHighlightEnabled = prefs.sameHighlightEnabled !== undefined ? Boolean(prefs.sameHighlightEnabled) : false;
                 paletteSectionCollapsedState = (prefs.paletteSectionCollapsedState && typeof prefs.paletteSectionCollapsedState === 'object')
                     ? prefs.paletteSectionCollapsedState
@@ -1535,6 +1553,128 @@
             if (!button) return;
             button.classList.toggle('active', mapColorEnabled);
             button.textContent = `地图：${mapColorEnabled ? '开' : '关'}`;
+        }
+
+        function getRoadCellIndex(x, y) {
+            return y * cols + x;
+        }
+
+        function serializeRoadCells() {
+            return Array.from(roadCells)
+                .sort((a, b) => a - b)
+                .map(index => ({
+                    x: index % cols,
+                    y: Math.floor(index / cols)
+                }));
+        }
+
+        function parseRoadCellIndex(entry) {
+            if (typeof entry === 'number' && Number.isInteger(entry) && entry >= 0 && entry < cols * rows) {
+                return entry;
+            }
+            if (!entry || typeof entry !== 'object') {
+                return null;
+            }
+            const x = Number(entry.x);
+            const y = Number(entry.y);
+            if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= cols || y >= rows) {
+                return null;
+            }
+            return getRoadCellIndex(x, y);
+        }
+
+        function getGridCellElement(x, y) {
+            if (!gridCellsCache || gridCellsCache.length !== cols * rows) {
+                gridCellsCache = Array.from(document.querySelectorAll('#grid .cell'));
+            }
+            return gridCellsCache[getRoadCellIndex(x, y)] || null;
+        }
+
+        function updateGridCellAppearance(x, y) {
+            const cell = getGridCellElement(x, y);
+            if (!cell) return;
+
+            if (roadCells.has(getRoadCellIndex(x, y))) {
+                cell.style.backgroundColor = roadCellFillColor;
+                return;
+            }
+
+            if (!mapColorEnabled) {
+                cell.style.backgroundColor = '';
+                return;
+            }
+
+            const color = getMapColorForCell(x, y);
+            cell.style.backgroundColor = color || '';
+        }
+
+        function isCellCoveredByBuilding(x, y, ignoreId = null) {
+            return placed.some(building => {
+                if (ignoreId !== null && building.id === ignoreId) return false;
+                const [width, height] = building.rot % 180 === 0 ? [building.w, building.h] : [building.h, building.w];
+                return x >= building.x && x < building.x + width && y >= building.y && y < building.y + height;
+            });
+        }
+
+        function clearRoadCellsUnderFootprint(x, y, w, h, rot) {
+            const [width, height] = rot % 180 === 0 ? [w, h] : [h, w];
+            let changed = false;
+            for (let yy = y; yy < y + height; yy++) {
+                for (let xx = x; xx < x + width; xx++) {
+                    const index = getRoadCellIndex(xx, yy);
+                    if (!roadCells.delete(index)) continue;
+                    updateGridCellAppearance(xx, yy);
+                    changed = true;
+                }
+            }
+            return changed;
+        }
+
+        function clearRoadCellsUnderBuildings(buildings) {
+            let changed = false;
+            buildings.forEach(building => {
+                changed = clearRoadCellsUnderFootprint(building.x, building.y, building.w, building.h, building.rot) || changed;
+            });
+            return changed;
+        }
+
+        function replaceRoadCells(entries, options = {}) {
+            const { redraw = true } = options;
+            roadCells.clear();
+            if (Array.isArray(entries)) {
+                entries.forEach(entry => {
+                    const index = parseRoadCellIndex(entry);
+                    if (index === null) return;
+                    const x = index % cols;
+                    const y = Math.floor(index / cols);
+                    if (isCellCoveredByBuilding(x, y)) return;
+                    roadCells.add(index);
+                });
+            }
+            if (redraw) {
+                applyMapColorOverlay();
+            }
+        }
+
+        function buildLayoutPayload() {
+            return {
+                version: 2,
+                placed: placed.map(p => ({ name: p.name, x: p.x, y: p.y, w: p.w, h: p.h, rot: p.rot })),
+                roads: serializeRoadCells()
+            };
+        }
+
+        function normalizeLayoutPayload(payload) {
+            if (Array.isArray(payload)) {
+                return { placed: payload, roads: [] };
+            }
+            if (!payload || typeof payload !== 'object') {
+                return { placed: [], roads: [] };
+            }
+            return {
+                placed: Array.isArray(payload.placed) ? payload.placed : [],
+                roads: Array.isArray(payload.roads) ? payload.roads : []
+            };
         }
 
         function getMapColorForCell(x, y) {
@@ -1796,6 +1936,14 @@
             button.textContent = `限定：${starredBuildingEnabled ? '开' : '关'}`;
         }
 
+        function updateRoadPaintToggleUi() {
+            const button = document.getElementById('roadPaintToggleBtn');
+            if (!button) return;
+            button.classList.toggle('active', roadPaintEnabled);
+            button.textContent = `道路：${roadPaintEnabled ? '开' : '关'}`;
+            document.body.classList.toggle('road-paint-enabled', roadPaintEnabled);
+        }
+
         function refreshStarredBuildingVisibility() {
             document.querySelectorAll('.placed').forEach(element => {
                 const id = Number(element.dataset.id);
@@ -1819,6 +1967,12 @@
             saveUiPrefs();
         }
 
+        function toggleRoadPaintMode() {
+            roadPaintEnabled = !roadPaintEnabled;
+            updateRoadPaintToggleUi();
+            saveUiPrefs();
+        }
+
         function applyMapColorOverlay() {
             if (!gridCellsCache || gridCellsCache.length !== cols * rows) {
                 gridCellsCache = Array.from(document.querySelectorAll('#grid .cell'));
@@ -1827,15 +1981,7 @@
 
             for (let y = 0; y < rows; y++) {
                 for (let x = 0; x < cols; x++) {
-                    const idx = y * cols + x;
-                    const cell = gridCellsCache[idx];
-                    if (!cell) continue;
-                    if (!mapColorEnabled) {
-                        cell.style.backgroundColor = '';
-                        continue;
-                    }
-                    const color = getMapColorForCell(x, y);
-                    cell.style.backgroundColor = color || '';
+                    updateGridCellAppearance(x, y);
                 }
             }
             updateMapSectionLines();
@@ -2106,6 +2252,7 @@
                 }
             }
 
+            clearRoadCellsUnderBuildings(selectedBuildings);
             calculateBuffers();
             updateCache();
             pushHistoryState();
@@ -2230,6 +2377,7 @@
                 }
             }
 
+            clearRoadCellsUnderBuildings(selectedBuildings);
             calculateBuffers();
             updateCache();
             pushHistoryState();
@@ -2405,13 +2553,15 @@
 
         async function loadPlacedItems(items, options = {}) {
             const { recordHistory = true, resetHistory = false } = options;
+            const normalizedPayload = normalizeLayoutPayload(items);
             setPendingPlacement(null);
             resetPlacedBuildings();
+            replaceRoadCells([], { redraw: false });
             const grid = document.getElementById('grid');
 
-            for (let index = 0; index < items.length; index += bulkRenderBatchSize) {
+            for (let index = 0; index < normalizedPayload.placed.length; index += bulkRenderBatchSize) {
                 const fragment = document.createDocumentFragment();
-                const chunk = items.slice(index, index + bulkRenderBatchSize);
+                const chunk = normalizedPayload.placed.slice(index, index + bulkRenderBatchSize);
                 chunk.forEach(item => {
                     placeBuilding(item.name, item.x, item.y, item.w, item.h, item.rot, {
                         skipRefresh: true,
@@ -2420,11 +2570,12 @@
                     });
                 });
                 grid.appendChild(fragment);
-                if (index + bulkRenderBatchSize < items.length) {
+                if (index + bulkRenderBatchSize < normalizedPayload.placed.length) {
                     await nextFrame();
                 }
             }
 
+            replaceRoadCells(normalizedPayload.roads, { redraw: true });
             calculateBuffers();
             updateCache();
             if (resetHistory) {
@@ -2573,6 +2724,7 @@
             
             const id = nextPlacedId++;
             const obj = {id, name, x: finalX, y: finalY, w, h, rot, landBuff: 0, commodityBuff: 0, activeBuffs: []};
+            clearRoadCellsUnderFootprint(finalX, finalY, w, h, rot);
             placed.push(obj);
             renderBuilding(obj, renderTarget);
             if (!skipRefresh) {
@@ -2861,6 +3013,7 @@
             if (!obj) return;
             clearSameBuildingHighlight();
             obj.rot = (obj.rot + 90) % 360;
+            clearRoadCellsUnderFootprint(obj.x, obj.y, obj.w, obj.h, obj.rot);
             const div = document.querySelector(`.placed[data-id='${id}']`);
             const [ww,hh] = obj.rot%180===0 ? [obj.w,obj.h] : [obj.h,obj.w];
             div.style.width = ww * cellSize + 'px';
@@ -2980,6 +3133,7 @@
                 // finalize buffers after short delay
                 if (bufferDebounceTimer) clearTimeout(bufferDebounceTimer);
                 bufferDebounceTimer = setTimeout(() => {
+                    clearRoadCellsUnderBuildings(movingBuildings);
                     calculateBuffers();
                     updateCache();
                     pushHistoryState();
@@ -3119,6 +3273,10 @@
         }
 
         function onContainerPointerDown(e) {
+            if (e.pointerType === 'mouse' && roadPaintEnabled && !e.target.closest('.placed')) {
+                startRoadPaintSession(e);
+                return;
+            }
             if (shouldUseTapPlacement() && pendingPlacement && !e.target.closest('.placed')) {
                 return;
             }
@@ -3158,8 +3316,93 @@
             }
         }
 
+        function paintRoadCell(x, y) {
+            if (x < 0 || y < 0 || x >= cols || y >= rows) return false;
+            if (isCellCoveredByBuilding(x, y)) return false;
+            const index = getRoadCellIndex(x, y);
+            if (roadCells.has(index)) return false;
+            roadCells.add(index);
+            updateGridCellAppearance(x, y);
+            return true;
+        }
+
+        function eraseRoadCell(x, y) {
+            if (x < 0 || y < 0 || x >= cols || y >= rows) return false;
+            const index = getRoadCellIndex(x, y);
+            if (!roadCells.has(index)) return false;
+            roadCells.delete(index);
+            updateGridCellAppearance(x, y);
+            return true;
+        }
+
+        function paintRoadAtClientPoint(clientX, clientY, mode = 'add') {
+            const position = getGridPositionFromClient(clientX, clientY);
+            if (!position) return false;
+            return mode === 'remove'
+                ? eraseRoadCell(position.x, position.y)
+                : paintRoadCell(position.x, position.y);
+        }
+
+        function startRoadPaintSession(e) {
+            if (e.button !== 0) return;
+            const startPosition = getGridPositionFromClient(e.clientX, e.clientY);
+            if (!startPosition || isCellCoveredByBuilding(startPosition.x, startPosition.y)) {
+                return;
+            }
+            suppressNextContainerClick = true;
+            clearSameBuildingHighlight();
+            const pointerId = e.pointerId;
+            const startIndex = getRoadCellIndex(startPosition.x, startPosition.y);
+            roadPaintSession = {
+                pointerId,
+                mode: roadCells.has(startIndex) ? 'remove' : 'add',
+                changed: false
+            };
+
+            const paintCurrentPoint = (event) => {
+                const changed = paintRoadAtClientPoint(event.clientX, event.clientY, roadPaintSession ? roadPaintSession.mode : 'add');
+                if (changed && roadPaintSession) {
+                    roadPaintSession.changed = true;
+                }
+            };
+
+            paintCurrentPoint(e);
+
+            const onPointerMove = (event) => {
+                if (roadPaintSession && event.pointerId !== undefined && roadPaintSession.pointerId !== undefined && event.pointerId !== roadPaintSession.pointerId) {
+                    return;
+                }
+                if (!(event.buttons & 1)) return;
+                paintCurrentPoint(event);
+            };
+
+            const finish = (event) => {
+                if (roadPaintSession && event.pointerId !== undefined && roadPaintSession.pointerId !== undefined && event.pointerId !== roadPaintSession.pointerId) {
+                    return;
+                }
+                document.removeEventListener('pointermove', onPointerMove);
+                document.removeEventListener('pointerup', finish);
+                document.removeEventListener('pointercancel', finish);
+                const changed = roadPaintSession && roadPaintSession.changed;
+                roadPaintSession = null;
+                if (changed) {
+                    updateCache();
+                    pushHistoryState();
+                }
+            };
+
+            document.addEventListener('pointermove', onPointerMove);
+            document.addEventListener('pointerup', finish);
+            document.addEventListener('pointercancel', finish);
+        }
+
         function onContainerClick(e) {
             if (e.target.closest('.placed')) return;
+            if (suppressNextContainerClick) {
+                suppressNextContainerClick = false;
+                e.preventDefault();
+                return;
+            }
             clearSameBuildingHighlight();
             if (tryPlacePendingAtClientPoint(e.clientX, e.clientY)) {
                 e.preventDefault();
@@ -3961,8 +4204,7 @@
         // localStorage cache functions
         function updateCache(){
             try{
-                const data = placed.map(p=>({name:p.name,x:p.x,y:p.y,w:p.w,h:p.h,rot:p.rot}));
-                localStorage.setItem('layoutCache', JSON.stringify(data));
+                localStorage.setItem('layoutCache', JSON.stringify(buildLayoutPayload()));
                 updateViewportCache();
             }catch(e){console.warn('cache failed',e);}        }
         function removePlaced(id){
@@ -4016,13 +4258,14 @@
             const raw = localStorage.getItem('layoutCache');
             if(raw){
                 try{
-                    const arr=JSON.parse(raw);
-                    loadPlacedItems(arr, { recordHistory: false, resetHistory: true });
+                    const payload=JSON.parse(raw);
+                    loadPlacedItems(payload, { recordHistory: false, resetHistory: true });
                 }catch(e){console.warn('load cache error',e);}            }
         }
         function exportLayout(){
-            const data = placed.map(p=>({name:p.name,x:p.x,y:p.y,w:p.w,h:p.h,rot:p.rot}));
-            const blob=new Blob([JSON.stringify(data, null, 2)],{type:'application/json'});
+            const payload = buildLayoutPayload();
+            const exportData = roadCells.size ? payload : payload.placed;
+            const blob=new Blob([JSON.stringify(exportData, null, 2)],{type:'application/json'});
             const url=URL.createObjectURL(blob);
             const d = new Date();
             const pad = (v) => String(v).padStart(2, '0');
@@ -4046,7 +4289,7 @@
                 };
             }
 
-            if (placed.length) {
+            if (placed.length || roadCells.size) {
                 let minX = Infinity;
                 let minY = Infinity;
                 let maxX = -Infinity;
@@ -4059,6 +4302,15 @@
                     minY = Math.min(minY, building.y);
                     maxX = Math.max(maxX, building.x + ww);
                     maxY = Math.max(maxY, building.y + hh);
+                });
+
+                roadCells.forEach(index => {
+                    const x = index % cols;
+                    const y = Math.floor(index / cols);
+                    minX = Math.min(minX, x);
+                    minY = Math.min(minY, y);
+                    maxX = Math.max(maxX, x + 1);
+                    maxY = Math.max(maxY, y + 1);
                 });
 
                 const paddedMinX = Math.max(0, minX - exportPaddingCells);
@@ -4228,6 +4480,18 @@
                 ctx.fillRect(originX, originY, mapWidth, mapHeight);
             }
 
+            roadCells.forEach(index => {
+                const worldX = index % cols;
+                const worldY = Math.floor(index / cols);
+                if (worldX < exportMinX || worldY < exportMinY || worldX >= exportMinX + exportCols || worldY >= exportMinY + exportRows) {
+                    return;
+                }
+                const localX = worldX - exportMinX;
+                const localY = worldY - exportMinY;
+                ctx.fillStyle = roadCellExportColor;
+                ctx.fillRect(originX + localX * cellSize, originY + localY * cellSize, cellSize, cellSize);
+            });
+
             // section lines for 100x100 map mode
             if (mapColorEnabled && sectionLineEnabled) {
                 ctx.save();
@@ -4352,8 +4616,8 @@
             const reader=new FileReader();
             reader.onload = ()=>{
                 try{
-                    const arr=JSON.parse(reader.result);
-                    loadPlacedItems(arr, { recordHistory: true });
+                    const payload=JSON.parse(reader.result);
+                    loadPlacedItems(payload, { recordHistory: true });
                 }catch(err){alert('导入失败');}
             };
             reader.readAsText(file);
@@ -4364,6 +4628,7 @@
             if(!confirm('确定要清空地图吗？此操作不可撤销。')) return;
             clearSameBuildingHighlight();
             resetPlacedBuildings();
+            replaceRoadCells([], { redraw: true });
             localStorage.removeItem('layoutCache');
             setPendingPlacement(null);
             calculateBuffers();
