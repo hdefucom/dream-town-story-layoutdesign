@@ -405,7 +405,7 @@
         #shortestPathLayer {
             position: absolute;
             inset: 0;
-            pointer-events: auto;
+            pointer-events: none;
             z-index: 6;
         }
         .shortest-path-cell {
@@ -1878,6 +1878,10 @@
             endActionBtn.textContent = '创建道路';
             endActionBtn.style.left = `${(endCell.x + 0.5) * cellSize}px`;
             endActionBtn.style.top = `${endCell.y * cellSize}px`;
+            endActionBtn.addEventListener('pointerdown', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+            });
             endActionBtn.addEventListener('click', (event) => {
                 event.preventDefault();
                 event.stopPropagation();
