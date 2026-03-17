@@ -1178,6 +1178,20 @@
         }
         .base-data-open-btn {
             width: 100%;
+            margin: 4px 0;
+            cursor: pointer;
+            border: 1px solid rgba(58, 87, 109, 0.2);
+            padding: 6px 7px;
+            text-align: center;
+            background: #edf4f3;
+            font-size: 11px;
+            line-height: 1.15;
+            border-radius: 8px;
+            touch-action: manipulation;
+            color: var(--text);
+        }
+        .base-data-open-btn:hover {
+            background: #dbeceb;
         }
 
         body.palette-open #panelBackdrop,
@@ -1360,8 +1374,8 @@
             <div class="palette-items" id="layoutsList"></div>
         </div>
         <div class="palette-section">
-            <div class="palette-header">基础数据</div>
-            <div class="palette-items">
+            <div class="palette-header" data-type="base-data">基础数据</div>
+            <div class="palette-items" id="baseDataList">
                 <button id="openBaseDataBtn" type="button" class="base-data-open-btn">建筑数据</button>
                 <button id="openBuffDataBtn" type="button" class="base-data-open-btn">专业街</button>
             </div>
@@ -1865,9 +1879,24 @@
             updateSameHighlightToggleUi();
             updateRoadPaintToggleUi();
             updateRoadValidationToggleUi();
+            initBaseDataSection();
             resetHistoryWithCurrentState();
             showManual();
             
+        }
+
+        function initBaseDataSection() {
+            const header = document.querySelector('.palette-header[data-type="base-data"]');
+            const listContainer = document.getElementById('baseDataList');
+            if (!header || !listContainer) return;
+
+            restorePaletteSectionState(header.dataset.type, listContainer);
+            syncPaletteHeaderState(header, listContainer);
+            header.addEventListener('click', () => {
+                listContainer.classList.toggle('collapsed');
+                setPaletteSectionCollapsed(header.dataset.type, listContainer.classList.contains('collapsed'));
+                syncPaletteHeaderState(header, listContainer);
+            });
         }
 
         function buildSerializableState() {
