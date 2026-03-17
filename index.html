@@ -635,6 +635,29 @@
                 0 0 0 8px rgba(198, 40, 40, 0.55),
                 0 8px 18px rgba(198, 40, 40, 0.28);
         }
+        .road-warn-badge {
+            display: none;
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            z-index: 6;
+            width: 18px;
+            height: 18px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            background: #d32f2f;
+            border: 1.5px solid rgba(255,255,255,0.9);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 900;
+            line-height: 1;
+            box-shadow: 0 2px 6px rgba(180,0,0,0.45);
+            pointer-events: none;
+        }
+        .placed.road-blocked .road-warn-badge {
+            display: flex;
+        }
         .placed .label {
             position: absolute;
             inset: 0;
@@ -1073,6 +1096,7 @@
                 <button id="sameHighlightToggleBtn" type="button">高亮相同</button>
                 <button id="starredBuildingToggleBtn" type="button">限定</button>
                 <button id="roadPaintToggleBtn" type="button">道路</button>
+                <button id="roadValidationToggleBtn" type="button">道路验证</button>
                 <button id="rotateGroupBtn" type="button">群转90°</button>
                 <button id="mirrorGroupBtn" type="button">镜像</button>
                 <button id="statsBtn" type="button">统计</button>
@@ -1225,6 +1249,7 @@
         let pinchInitialScale = 1;
         let starredBuildingEnabled = true;
         let roadPaintEnabled = false;
+        let roadValidationEnabled = false;
         let roadPaintSession = null;
         let suppressNextContainerClick = false;
         const roadCellFillColor = 'rgba(74, 78, 84, 0.92)';
@@ -1296,6 +1321,7 @@
             document.getElementById('undoBtn').addEventListener('click', () => undoHistory());
             document.getElementById('redoBtn').addEventListener('click', () => redoHistory());
             document.getElementById('roadPaintToggleBtn').addEventListener('click', toggleRoadPaintMode);
+            document.getElementById('roadValidationToggleBtn').addEventListener('click', toggleRoadValidationMode);
             document.getElementById('rotateGroupBtn').addEventListener('click', rotateSelectedGroupClockwise);
             document.getElementById('mirrorGroupBtn').addEventListener('click', mirrorSelectedGroupVertically);
             document.getElementById('statsBtn').addEventListener('click', showStats);
@@ -1374,6 +1400,7 @@
             updateSectionLineToggleUi();
             updateSameHighlightToggleUi();
             updateRoadPaintToggleUi();
+            updateRoadValidationToggleUi();
             resetHistoryWithCurrentState();
             showManual();
             
@@ -1542,6 +1569,7 @@
                     sectionLineEnabled,
                     starredBuildingEnabled,
                     roadPaintEnabled,
+                    roadValidationEnabled,
                     sameHighlightEnabled,
                     paletteSectionCollapsedState
                 }));
@@ -1560,6 +1588,7 @@
                 sectionLineEnabled = prefs.sectionLineEnabled !== undefined ? Boolean(prefs.sectionLineEnabled) : true;
                 starredBuildingEnabled = prefs.starredBuildingEnabled !== undefined ? Boolean(prefs.starredBuildingEnabled) : true;
                 roadPaintEnabled = prefs.roadPaintEnabled !== undefined ? Boolean(prefs.roadPaintEnabled) : false;
+                roadValidationEnabled = prefs.roadValidationEnabled !== undefined ? Boolean(prefs.roadValidationEnabled) : false;
                 sameHighlightEnabled = prefs.sameHighlightEnabled !== undefined ? Boolean(prefs.sameHighlightEnabled) : false;
                 paletteSectionCollapsedState = (prefs.paletteSectionCollapsedState && typeof prefs.paletteSectionCollapsedState === 'object')
                     ? prefs.paletteSectionCollapsedState
@@ -1825,6 +1854,7 @@
             if (!changed) {
                 return;
             }
+            calculateBuffers();
             updateCache();
             pushHistoryState();
         }
@@ -2029,6 +2059,13 @@
             document.body.classList.toggle('road-paint-enabled', roadPaintEnabled);
         }
 
+        function updateRoadValidationToggleUi() {
+            const button = document.getElementById('roadValidationToggleBtn');
+            if (!button) return;
+            button.classList.toggle('active', roadValidationEnabled);
+            button.textContent = `道路验证：${roadValidationEnabled ? '开' : '关'}`;
+        }
+
         function refreshStarredBuildingVisibility() {
             document.querySelectorAll('.placed').forEach(element => {
                 const id = Number(element.dataset.id);
@@ -2055,6 +2092,13 @@
         function toggleRoadPaintMode() {
             roadPaintEnabled = !roadPaintEnabled;
             updateRoadPaintToggleUi();
+            saveUiPrefs();
+        }
+
+        function toggleRoadValidationMode() {
+            roadValidationEnabled = !roadValidationEnabled;
+            updateRoadValidationToggleUi();
+            calculateBuffers();
             saveUiPrefs();
         }
 
@@ -2540,6 +2584,40 @@
 
             const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}" viewBox="0 0 ${widthPx} ${heightPx}">${rects.join('')}</svg>`;
             return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+        }
+
+        function buildingNeedsRoad(building) {
+            if (!buildData) return false;
+            const data = buildData.find(d => d.name === building.name);
+            if (!data) return false;
+            return data.notRoad !== true;
+        }
+
+        function buildingHasAdjacentRoad(building) {
+            const [ww, hh] = building.rot % 180 === 0 ? [building.w, building.h] : [building.h, building.w];
+            const x = building.x, y = building.y;
+            // top row: y-1, x..x+ww-1
+            for (let cx = x; cx < x + ww; cx++) {
+                if (roadCells.has(getRoadCellIndex(cx, y - 1))) return true;
+            }
+            // bottom row: y+hh, x..x+ww-1
+            for (let cx = x; cx < x + ww; cx++) {
+                if (roadCells.has(getRoadCellIndex(cx, y + hh))) return true;
+            }
+            // left col: x-1, y..y+hh-1
+            for (let cy = y; cy < y + hh; cy++) {
+                if (roadCells.has(getRoadCellIndex(x - 1, cy))) return true;
+            }
+            // right col: x+ww, y..y+hh-1
+            for (let cy = y; cy < y + hh; cy++) {
+                if (roadCells.has(getRoadCellIndex(x + ww, cy))) return true;
+            }
+            return false;
+        }
+
+        function isBuildingRoadBlocked(building) {
+            if (!roadValidationEnabled) return false;
+            return buildingNeedsRoad(building) && !buildingHasAdjacentRoad(building);
         }
 
         function applyBuildingVisualStyle(building, element) {
@@ -3090,6 +3168,11 @@
             label.className = 'label';
             label.textContent = obj.name;
             div.appendChild(label);
+            const roadWarnBadge = document.createElement('div');
+            roadWarnBadge.className = 'road-warn-badge';
+            roadWarnBadge.textContent = '!';
+            div.appendChild(roadWarnBadge);
+            div.classList.toggle('road-blocked', isBuildingRoadBlocked(obj));
             (renderTarget || document.getElementById('grid')).appendChild(div);
         }
 
@@ -3471,6 +3554,7 @@
                 const changed = roadPaintSession && roadPaintSession.changed;
                 roadPaintSession = null;
                 if (changed) {
+                    calculateBuffers();
                     updateCache();
                     pushHistoryState();
                 }
@@ -3512,7 +3596,7 @@
             buffData.forEach(rule=>{
                 const ruleKey = `${rule.name || ''}|${[...rule.builds].sort().join('|')}|${rule.land}|${rule.commodity}`;
                 // find matching placed buildings by name
-                const candidates = placed.filter(p=>rule.builds.includes(p.name));
+                const candidates = placed.filter(p=>rule.builds.includes(p.name) && !isBuildingRoadBlocked(p));
                 // try every combination of three distinct items
                 for (let i=0;i<candidates.length;i++){
                     for (let j=i+1;j<candidates.length;j++){
@@ -3523,7 +3607,7 @@
                             if(JSON.stringify(names)!==JSON.stringify(ruleNames)) continue;
                             if(groupContiguous(group)){
                                 // apply buffs to group and neighbours
-                                const area = buildingsWithin(group);
+                                const area = buildingsWithin(group).filter(b => !isBuildingRoadBlocked(b));
                                 area.forEach(b=>{
                                     const buildingAppliedBuffKeys = appliedBuffKeys.get(b.id);
                                     if (buildingAppliedBuffKeys.has(ruleKey)) {
@@ -3652,6 +3736,10 @@
             placed.forEach(p=>{
                 const div = document.querySelector(`.placed[data-id='${p.id}'] .label`);
                 div.textContent = p.name + `\n+${p.landBuff}L +${p.commodityBuff}C`;
+                const placedDiv = div.closest('.placed');
+                if (placedDiv) {
+                    placedDiv.classList.toggle('road-blocked', isBuildingRoadBlocked(p));
+                }
             });
         }
 
