@@ -1851,12 +1851,12 @@
             shortestPathCellsCache.forEach(cell => {
                 changed = paintRoadCell(cell.x, cell.y) || changed;
             });
-            if (!changed) {
-                return;
+            if (changed) {
+                calculateBuffers();
+                updateCache();
+                pushHistoryState();
             }
-            calculateBuffers();
-            updateCache();
-            pushHistoryState();
+            clearShortestPathDisplay();
         }
 
         function renderShortestPath(pathCells) {
@@ -3398,6 +3398,11 @@
 
                 selectionBox.style.display = 'none';
 
+                // Prevent drag-end mouseup from triggering container click cleanup.
+                if (!isClick) {
+                    suppressNextContainerClick = true;
+                }
+
                 if (isClick) {
                     if (!appendSelection) {
                         clearSelectedBuilding();
@@ -3586,6 +3591,7 @@
                 return;
             }
             clearSameBuildingHighlight();
+            clearShortestPathDisplay();
             if (tryPlacePendingAtClientPoint(e.clientX, e.clientY)) {
                 e.preventDefault();
                 return;
