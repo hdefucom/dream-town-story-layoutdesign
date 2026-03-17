@@ -754,6 +754,42 @@
             background: rgba(255, 250, 240, 0.96);
             backdrop-filter: blur(12px);
         }
+        #siblingSwitchFab {
+            position: absolute;
+            right: 12px;
+            bottom: 12px;
+            z-index: 52;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .sibling-switch-btn {
+            min-width: 38px;
+            height: 34px;
+            padding: 0 10px;
+            border: 1px solid rgba(104, 82, 55, 0.18);
+            border-radius: 10px;
+            background: rgba(255, 250, 240, 0.96);
+            color: var(--text);
+            font-size: 16px;
+            line-height: 1;
+            cursor: pointer;
+            backdrop-filter: blur(12px);
+        }
+        .sibling-switch-btn:hover {
+            background: #fff;
+            border-color: rgba(29, 107, 87, 0.35);
+        }
+        .sibling-switch-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            border-color: rgba(104, 82, 55, 0.14);
+            color: rgba(45, 36, 24, 0.55);
+        }
+        .sibling-switch-btn:disabled:hover {
+            background: rgba(255, 250, 240, 0.96);
+            border-color: rgba(104, 82, 55, 0.14);
+        }
         /* 多选按钮未激活时：虚线描边，暗示可切换 */
         #mobileMultiSelectBtn {
             border-style: dashed;
@@ -1268,6 +1304,9 @@
             #mobileActionBar {
                 display: grid;
             }
+            #siblingSwitchFab {
+                bottom: 62px;
+            }
             #crosshairLayer {
                 display: none !important;
             }
@@ -1423,6 +1462,10 @@
             <button id="mobileRotateBtn" class="action-button" type="button">旋转</button>
             <button id="mobileDeleteBtn" class="action-button danger" type="button">删除</button>
             <button id="mobileMultiSelectBtn" class="action-button" type="button">多选</button>
+        </div>
+        <div id="siblingSwitchFab" aria-label="同类切换">
+            <button id="siblingPrevBtn" class="sibling-switch-btn" type="button" title="上一个同类">←</button>
+            <button id="siblingNextBtn" class="sibling-switch-btn" type="button" title="下一个同类">→</button>
         </div>
     </div>
     <aside id="detailsPanel">
@@ -1741,6 +1784,8 @@
             document.getElementById('panelBackdrop').addEventListener('click', closePanels);
             document.getElementById('mobileRotateBtn').addEventListener('click', rotateSelectedBuilding);
             document.getElementById('mobileDeleteBtn').addEventListener('click', deleteSelectedBuildings);
+            document.getElementById('siblingPrevBtn').addEventListener('click', () => switchSiblingBuildingByKeyboard(-1));
+            document.getElementById('siblingNextBtn').addEventListener('click', () => switchSiblingBuildingByKeyboard(1));
             document.getElementById('statsCloseBtn').addEventListener('click', closeStats);
             document.getElementById('baseDataCloseBtn').addEventListener('click', closeBaseData);
             document.getElementById('buffDataCloseBtn').addEventListener('click', closeBuffData);
@@ -1880,6 +1925,7 @@
             updateRoadPaintToggleUi();
             updateRoadValidationToggleUi();
             initBaseDataSection();
+            updateSiblingSwitchButtons();
             resetHistoryWithCurrentState();
             showManual();
             
@@ -3491,6 +3537,7 @@
                 selectedBuildingId = ids[0];
             }
             clearBuffHighlight();
+            updateSiblingSwitchButtons();
             renderBuildingDetails(getSelectedBuilding());
         }
 
@@ -3524,6 +3571,80 @@
                 .filter(item => normalizeBuildingName(item.name) === targetName)
                 .map(item => item.id);
             updateSelectedBuildingStyles();
+        }
+
+        function getOrderedPlacedIds(ids) {
+            return ids
+                .map(id => getPlacedById(id))
+                .filter(Boolean)
+                .sort((a, b) => (a.y - b.y) || (a.x - b.x) || (a.id - b.id))
+                .map(item => item.id);
+        }
+
+        function getSiblingNavigationTargetIds() {
+            if (selectedBuildingId === null) return [];
+            const selected = getSelectedBuilding();
+            if (!selected) return [];
+
+            const inBuffContext = highlightedBuffSourceIds.includes(selectedBuildingId);
+            if (inBuffContext) {
+                return getOrderedPlacedIds(highlightedBuffSourceIds);
+            }
+
+            return getOrderedPlacedIds(
+                placed
+                    .filter(item => normalizeBuildingName(item.name) === normalizeBuildingName(selected.name))
+                    .map(item => item.id)
+            );
+        }
+
+        function updateSiblingSwitchButtons() {
+            const prevBtn = document.getElementById('siblingPrevBtn');
+            const nextBtn = document.getElementById('siblingNextBtn');
+            if (!prevBtn || !nextBtn) return;
+
+            const canSwitch = getSiblingNavigationTargetIds().length > 1;
+            prevBtn.disabled = !canSwitch;
+            nextBtn.disabled = !canSwitch;
+        }
+
+        function selectSingleBuildingForNavigation(id, options = {}) {
+            const { preserveBuffHighlight = false } = options;
+            const targetBuilding = getPlacedById(id);
+            if (!targetBuilding) return false;
+
+            const preservedBuffIds = preserveBuffHighlight ? [...highlightedBuffSourceIds] : [];
+            const preservedBuffLabel = preserveBuffHighlight ? highlightedBuffLabel : '';
+
+            setSelection([id], id);
+
+            if (preserveBuffHighlight && preservedBuffIds.length) {
+                highlightedBuffSourceIds = preservedBuffIds;
+                highlightedBuffLabel = preservedBuffLabel;
+                updateSelectedBuildingStyles();
+            }
+
+            highlightSameBuildingsByBuilding(getSelectedBuilding());
+            ensureBuildingsVisible([id]);
+            updateSiblingSwitchButtons();
+            return true;
+        }
+
+        function switchSiblingBuildingByKeyboard(direction) {
+            if (selectedBuildingId === null || !Number.isInteger(direction) || !direction) return false;
+
+            const selected = getSelectedBuilding();
+            if (!selected) return false;
+
+            const inBuffContext = highlightedBuffSourceIds.includes(selectedBuildingId);
+            const targetIds = getSiblingNavigationTargetIds();
+
+            if (targetIds.length <= 1) return false;
+
+            const currentIndex = targetIds.indexOf(selectedBuildingId);
+            const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+            const nextIndex = (safeIndex + direction + targetIds.length) % targetIds.length;
+            return selectSingleBuildingForNavigation(targetIds[nextIndex], { preserveBuffHighlight: inBuffContext });
         }
 
         function toggleSameHighlightMode() {
@@ -4532,6 +4653,14 @@
             }
 
             if ((manualVisible || statsVisible || baseDataVisible || buffDataVisible) && e.key !== 'Escape') {
+                return;
+            }
+
+            if (!isClipboardModifier && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+                const moved = switchSiblingBuildingByKeyboard(e.key === 'ArrowRight' ? 1 : -1);
+                if (moved) {
+                    e.preventDefault();
+                }
                 return;
             }
 
