@@ -970,9 +970,49 @@
             table-layout: auto;
             min-width: unset;
         }
-        #buffDataTable tbody td:nth-child(2) {
+        #buffDataTable tbody td:nth-child(n+2):nth-child(-n+4) {
             white-space: normal;
             word-break: break-all;
+            text-align: left;
+        }
+        #buffDataTable thead th:nth-child(2),
+        #buffDataTable tbody td:nth-child(2),
+        #buffDataTable thead th:nth-child(5),
+        #buffDataTable tbody td:nth-child(5),
+        #buffDataTable thead th:nth-child(7),
+        #buffDataTable tbody td:nth-child(7) {
+            border-left: 2px solid rgba(122, 103, 74, 0.5);
+        }
+        #buffDataTable thead th:nth-child(4),
+        #buffDataTable tbody td:nth-child(4),
+        #buffDataTable thead th:nth-child(6),
+        #buffDataTable tbody td:nth-child(6),
+        #buffDataTable thead th:nth-child(8),
+        #buffDataTable tbody td:nth-child(8) {
+            border-right: 2px solid rgba(122, 103, 74, 0.5);
+        }
+        #buffDataTable thead th:nth-child(n+2):nth-child(-n+4),
+        #buffDataTable tbody td:nth-child(n+2):nth-child(-n+4) {
+            background: rgba(240, 231, 216, 0.34);
+        }
+        #buffDataTable thead th:nth-child(n+5):nth-child(-n+6),
+        #buffDataTable tbody td:nth-child(n+5):nth-child(-n+6) {
+            background: rgba(228, 239, 227, 0.5);
+        }
+        #buffDataTable thead th:nth-child(n+7):nth-child(-n+8),
+        #buffDataTable tbody td:nth-child(n+7):nth-child(-n+8) {
+            background: rgba(228, 235, 244, 0.52);
+        }
+        #buffDataTable th:nth-child(n+5):nth-child(-n+8),
+        #buffDataTable td:nth-child(n+5):nth-child(-n+8) {
+            white-space: nowrap;
+            text-align: center;
+        }
+        #buffDataTable .buff-data-view-btn {
+            min-width: 42px;
+            padding: 2px 6px;
+            font-size: 12px;
+            line-height: 1.2;
         }
         #buffDataDialog {
             width: min(1280px, calc(100vw - 32px));
@@ -1457,13 +1497,21 @@
                         <col />
                         <col />
                         <col />
+                        <col style="width:56px" />
+                        <col style="width:88px" />
+                        <col style="width:56px" />
+                        <col style="width:60px" />
                     </colgroup>
                     <thead>
                         <tr>
                             <th data-buff-sort-key="name">专业街</th>
-                            <th data-buff-sort-key="builds">建筑</th>
+                            <th data-buff-sort-key="builds">建筑1</th>
+                            <th>建筑2</th>
+                            <th>建筑3</th>
                             <th data-buff-sort-key="land">地价加成</th>
                             <th data-buff-sort-key="commodity">商品价格加成</th>
+                            <th data-buff-sort-key="existsCount">存在数量</th>
+                            <th>查看</th>
                         </tr>
                     </thead>
                     <tbody id="buffDataTableBody"></tbody>
@@ -1698,6 +1746,20 @@
                     buffDataSortState.direction = 'asc';
                 }
                 renderBuffDataTable();
+            });
+            document.getElementById('buffDataTableBody').addEventListener('dblclick', (event) => {
+                const row = event.target.closest('tr[data-buff-rule-index]');
+                if (!row) return;
+                const ruleIndex = Number(row.dataset.buffRuleIndex);
+                if (!Number.isInteger(ruleIndex) || !buffData[ruleIndex]) return;
+                highlightBuffRuleSources(buffData[ruleIndex]);
+            });
+            document.getElementById('buffDataTableBody').addEventListener('click', (event) => {
+                const button = event.target.closest('button[data-buff-rule-index]');
+                if (!button) return;
+                const ruleIndex = Number(button.dataset.buffRuleIndex);
+                if (!Number.isInteger(ruleIndex) || !buffData[ruleIndex]) return;
+                highlightBuffRuleSources(buffData[ruleIndex]);
             });
             document.querySelector('#baseDataDialog thead').addEventListener('click', (event) => {
                 const th = event.target.closest('th[data-sort-key]');
@@ -4853,8 +4915,54 @@
             baseDataVisible = false;
         }
 
+        function getBuffRuleOccurrences(rule) {
+            const ruleBuilds = Array.isArray(rule?.builds) ? [...rule.builds] : [];
+            if (!ruleBuilds.length) return [];
+
+            const serializedRuleNames = JSON.stringify([...ruleBuilds].sort());
+            const candidates = placed.filter(item => ruleBuilds.includes(item.name) && !isBuildingRoadBlocked(item));
+            const occurrences = [];
+            const seen = new Set();
+
+            for (let i = 0; i < candidates.length; i += 1) {
+                for (let j = i + 1; j < candidates.length; j += 1) {
+                    for (let k = j + 1; k < candidates.length; k += 1) {
+                        const group = [candidates[i], candidates[j], candidates[k]];
+                        const serializedNames = JSON.stringify(group.map(item => item.name).sort());
+                        if (serializedNames !== serializedRuleNames) continue;
+                        if (!groupContiguous(group)) continue;
+
+                        const sourceIds = group.map(item => item.id).sort((a, b) => a - b);
+                        const signature = sourceIds.join(',');
+                        if (seen.has(signature)) continue;
+
+                        seen.add(signature);
+                        occurrences.push({
+                            sourceIds,
+                            sourceNames: group.map(item => item.name)
+                        });
+                    }
+                }
+            }
+
+            return occurrences;
+        }
+
+        function getBuffDataRows() {
+            return buffData.map((item, ruleIndex) => {
+                const occurrences = getBuffRuleOccurrences(item);
+                const sourceIds = Array.from(new Set(occurrences.flatMap(entry => entry.sourceIds)));
+                return {
+                    ...item,
+                    ruleIndex,
+                    existsCount: occurrences.length,
+                    sourceIds
+                };
+            });
+        }
+
         function getSortedBuffDataRows() {
-            const rows = [...buffData];
+            const rows = getBuffDataRows();
             const key = String(buffDataSortState.key || '').trim();
             if (!key) return rows;
             const direction = buffDataSortState.direction === 'desc' ? -1 : 1;
@@ -4863,6 +4971,10 @@
                 if (key === 'builds') {
                     av = Array.isArray(av) ? av.join('') : String(av ?? '');
                     bv = Array.isArray(bv) ? bv.join('') : String(bv ?? '');
+                }
+                if (key === 'sourceIds') {
+                    av = Array.isArray(av) ? av.join(',') : String(av ?? '');
+                    bv = Array.isArray(bv) ? bv.join(',') : String(bv ?? '');
                 }
                 const aEmpty = av === null || av === undefined || String(av).trim() === '';
                 const bEmpty = bv === null || bv === undefined || String(bv).trim() === '';
@@ -4900,17 +5012,40 @@
             emptyEl.style.display = 'none';
             const rows = getSortedBuffDataRows();
             tbody.innerHTML = rows.map(item => {
-                const builds = Array.isArray(item.builds) ? item.builds.join(' + ') : String(item.builds ?? '');
+                const builds = Array.isArray(item.builds) ? item.builds : [item.builds ?? ''];
+                const [build1 = '', build2 = '', build3 = ''] = builds;
                 const land = item.land !== undefined && item.land !== null ? String(item.land) : '';
                 const commodity = item.commodity !== undefined && item.commodity !== null ? String(item.commodity) : '';
-                return `<tr>
+                const rowTitle = item.existsCount > 0 ? '双击高亮地图中的触发建筑' : '当前地图中不存在该专业街';
+                const actionButton = item.existsCount > 0
+                    ? `<button type="button" class="buff-data-view-btn" data-buff-rule-index="${item.ruleIndex}">查看</button>`
+                    : '<button type="button" class="buff-data-view-btn" disabled>查看</button>';
+                return `<tr data-buff-rule-index="${item.ruleIndex}" title="${escapeHtml(rowTitle)}">
                     <td>${escapeHtml(String(item.name ?? ''))}</td>
-                    <td style="text-align:left">${escapeHtml(builds)}</td>
+                    <td>${escapeHtml(String(build1))}</td>
+                    <td>${escapeHtml(String(build2))}</td>
+                    <td>${escapeHtml(String(build3))}</td>
                     <td>${escapeHtml(land)}</td>
                     <td>${escapeHtml(commodity)}</td>
+                    <td>${escapeHtml(String(item.existsCount ?? 0))}</td>
+                    <td>${actionButton}</td>
                 </tr>`;
             }).join('');
             updateBuffDataSortHeaderState();
+        }
+
+        function highlightBuffRuleSources(rule) {
+            const rows = getBuffDataRows();
+            const targetRow = rows.find(item => item.ruleIndex === buffData.indexOf(rule));
+            if (!targetRow || !targetRow.sourceIds.length) return;
+
+            closeBuffData();
+            clearSameBuildingHighlight();
+            setSelection(targetRow.sourceIds, targetRow.sourceIds[0]);
+            highlightedBuffSourceIds = [...targetRow.sourceIds];
+            highlightedBuffLabel = String(targetRow.name || '专业街');
+            updateSelectedBuildingStyles();
+            ensureBuildingsVisible(targetRow.sourceIds);
         }
 
         function showBuffData() {
