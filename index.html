@@ -1084,6 +1084,18 @@
         .base-data-col-area {
             width: 58px;
         }
+        .base-data-col-count {
+            width: 58px;
+        }
+        .base-data-col-action {
+            width: 60px;
+        }
+        .base-data-row-action-btn {
+            min-width: 42px;
+            padding: 2px 6px;
+            font-size: 12px;
+            line-height: 1.2;
+        }
         .base-data-table thead th {
             position: sticky;
             top: 0;
@@ -1547,6 +1559,8 @@
                         <col class="base-data-col-treasure" />
                         <col class="base-data-col-lvup" />
                         <col class="base-data-col-area" />
+                        <col class="base-data-col-count" />
+                        <col class="base-data-col-action" />
                     </colgroup>
                     <thead>
                         <tr>
@@ -1567,6 +1581,8 @@
                             <th data-sort-key="treasure_where">宝藏条件</th>
                             <th data-sort-key="lv_up">LVUP条件</th>
                             <th data-sort-key="area">占地</th>
+                            <th data-sort-key="existsCount">存在数量</th>
+                            <th>查看</th>
                         </tr>
                     </thead>
                     <tbody id="baseDataTableBody"></tbody>
@@ -1779,6 +1795,13 @@
                     baseDataSortState.direction = 'asc';
                 }
                 renderBaseDataTable();
+            });
+            document.getElementById('baseDataTableBody').addEventListener('click', (event) => {
+                const button = event.target.closest('button[data-base-row-index]');
+                if (!button) return;
+                const rowIndex = Number(button.dataset.baseRowIndex);
+                if (!Number.isInteger(rowIndex) || !buildData[rowIndex]) return;
+                highlightBaseDataBuildings(buildData[rowIndex]);
             });
             document.getElementById('statsGroupTables').addEventListener('click', (event) => {
                 const header = event.target.closest('.stats-group-name[data-group]');
@@ -4781,6 +4804,9 @@
                 const h = Number(item && item.h);
                 return Number.isFinite(w) && Number.isFinite(h) ? (w * h) : null;
             }
+            if (key === 'existsCount') {
+                return item ? item.existsCount : null;
+            }
             return item ? item[key] : null;
         }
 
@@ -4822,8 +4848,30 @@
             return String(a).localeCompare(String(b), 'zh-Hans-CN', { numeric: true, sensitivity: 'base' });
         }
 
+        function getBaseDataRows() {
+            const placedByName = new Map();
+            placed.forEach(building => {
+                const key = normalizeBuildingName(building.name);
+                if (!key) return;
+                const entry = placedByName.get(key) || { count: 0, ids: [] };
+                entry.count += 1;
+                entry.ids.push(building.id);
+                placedByName.set(key, entry);
+            });
+
+            return buildData.map((item, sourceIndex) => {
+                const stats = placedByName.get(normalizeBuildingName(item.name)) || { count: 0, ids: [] };
+                return {
+                    ...item,
+                    sourceIndex,
+                    existsCount: stats.count,
+                    placedIds: [...stats.ids]
+                };
+            });
+        }
+
         function getSortedBaseDataRows() {
-            const rows = [...buildData];
+            const rows = getBaseDataRows();
             const key = String(baseDataSortState.key || '').trim();
             if (!key) return rows;
 
@@ -4881,7 +4929,8 @@
                     item.tool,
                     item.treasure_where,
                     item.lv_up,
-                    formatBaseDataArea(item)
+                    formatBaseDataArea(item),
+                    item.existsCount
                 ];
                 const rowCells = rawCells.map(raw => {
                     const text = formatBaseDataValue(raw);
@@ -4889,11 +4938,28 @@
                     const classAttr = className ? ` class="${className}"` : '';
                     return `<td${classAttr}>${escapeHtml(text)}</td>`;
                 });
+                const actionButton = item.existsCount > 0
+                    ? `<button type="button" class="base-data-row-action-btn" data-base-row-index="${item.sourceIndex}">查看</button>`
+                    : '<button type="button" class="base-data-row-action-btn" disabled>查看</button>';
+                rowCells.push(`<td>${actionButton}</td>`);
                 return `<tr>${rowCells.join('')}</tr>`;
             }).join('');
 
             tbody.innerHTML = rowsHtml;
             updateBaseDataSortHeaderState();
+        }
+
+        function highlightBaseDataBuildings(baseItem) {
+            const rows = getBaseDataRows();
+            const targetRow = rows.find(item => item.sourceIndex === buildData.indexOf(baseItem));
+            if (!targetRow || !targetRow.placedIds.length) return;
+
+            closeBaseData();
+            clearSameBuildingHighlight();
+            setSelection(targetRow.placedIds, targetRow.placedIds[0]);
+            highlightedSameBuildingIds = [...targetRow.placedIds];
+            updateSelectedBuildingStyles();
+            ensureBuildingsVisible(targetRow.placedIds);
         }
 
         function showBaseData() {
