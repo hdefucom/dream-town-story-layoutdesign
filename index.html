@@ -2596,21 +2596,31 @@
         function buildingHasAdjacentRoad(building) {
             const [ww, hh] = building.rot % 180 === 0 ? [building.w, building.h] : [building.h, building.w];
             const x = building.x, y = building.y;
-            // top row: y-1, x..x+ww-1
-            for (let cx = x; cx < x + ww; cx++) {
-                if (roadCells.has(getRoadCellIndex(cx, y - 1))) return true;
+            // For rectangles, only the short sides count.
+            // ww < hh → horizontal sides (top/bottom) are short; check them only.
+            // ww > hh → vertical sides (left/right) are short; check them only.
+            // ww === hh → square; all 4 sides count.
+            const checkHorizontal = ww <= hh; // top & bottom
+            const checkVertical   = hh <= ww; // left & right
+            if (checkHorizontal) {
+                // top row: y-1
+                for (let cx = x; cx < x + ww; cx++) {
+                    if (roadCells.has(getRoadCellIndex(cx, y - 1))) return true;
+                }
+                // bottom row: y+hh
+                for (let cx = x; cx < x + ww; cx++) {
+                    if (roadCells.has(getRoadCellIndex(cx, y + hh))) return true;
+                }
             }
-            // bottom row: y+hh, x..x+ww-1
-            for (let cx = x; cx < x + ww; cx++) {
-                if (roadCells.has(getRoadCellIndex(cx, y + hh))) return true;
-            }
-            // left col: x-1, y..y+hh-1
-            for (let cy = y; cy < y + hh; cy++) {
-                if (roadCells.has(getRoadCellIndex(x - 1, cy))) return true;
-            }
-            // right col: x+ww, y..y+hh-1
-            for (let cy = y; cy < y + hh; cy++) {
-                if (roadCells.has(getRoadCellIndex(x + ww, cy))) return true;
+            if (checkVertical) {
+                // left col: x-1
+                for (let cy = y; cy < y + hh; cy++) {
+                    if (roadCells.has(getRoadCellIndex(x - 1, cy))) return true;
+                }
+                // right col: x+ww
+                for (let cy = y; cy < y + hh; cy++) {
+                    if (roadCells.has(getRoadCellIndex(x + ww, cy))) return true;
+                }
             }
             return false;
         }
