@@ -731,6 +731,32 @@
             pointer-events: none;
         }
         .details-meta { font-size: 12px; color: #4b443b; line-height: 1.7; }
+        .details-main-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 100px;
+            gap: 8px;
+            align-items: start;
+        }
+        .details-main-grid.single {
+            grid-template-columns: minmax(0, 1fr);
+        }
+        .details-main-col {
+            min-width: 0;
+        }
+        .details-attr-block {
+            border-left: 1px dashed rgba(122, 103, 74, 0.22);
+            padding-left: 7px;
+        }
+        .details-attr-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #3d362c;
+            margin-bottom: 2px;
+        }
+        .details-attr-block .details-meta {
+            font-size: 11px;
+            line-height: 1.45;
+        }
         .buff-list { display: flex; flex-direction: column; gap: 8px; }
         .buff-item { border: 1px solid rgba(122, 103, 74, 0.14); border-radius: 10px; background: #fff; padding: 10px; cursor: pointer; }
         .buff-item:hover { border-color: rgba(29, 107, 87, 0.25); background: #fbfbf9; }
@@ -3761,6 +3787,36 @@
                 hasCommodity ? `<div class="details-meta">商品：${formatComputedValue(commodityValue)}</div>` : ''
             ].join('');
 
+            const baseAttrEntries = [
+                { label: '奋勉', value: buildingSource?.p_fm },
+                { label: '才能', value: buildingSource?.p_cn },
+                { label: '智商', value: buildingSource?.p_zs },
+                { label: '魅力', value: buildingSource?.p_ml },
+                { label: '食品', value: buildingSource?.d_sp },
+                { label: '待客', value: buildingSource?.d_dk },
+                { label: '娱乐', value: buildingSource?.d_yl },
+                { label: '文化', value: buildingSource?.d_wh }
+            ].filter(entry => !(entry.value === null || entry.value === undefined || String(entry.value).trim() === ''));
+
+            const baseAttrHtml = baseAttrEntries.length
+                ? `<div class="details-attr-block">
+                    <div class="details-attr-title">基础属性</div>
+                    ${baseAttrEntries.map(entry => `<div class="details-meta">${escapeHtml(entry.label)}：${escapeHtml(String(entry.value))}</div>`).join('')}
+                </div>`
+                : '';
+
+            const detailsInfoHtml = `
+                <div class="details-main-col">
+                    <div class="details-meta">坐标：(${building.x}, ${building.y})</div>
+                    <div class="details-meta">尺寸：${building.w} x ${building.h}</div>
+                    <div class="details-meta">旋转：${building.rot}°</div>
+                    <div class="details-meta">Buff 数量：${building.activeBuffs.length}</div>
+                    <div class="details-meta">总地价加成：+${building.landBuff}</div>
+                    <div class="details-meta">总商品加成：+${building.commodityBuff}</div>
+                    ${extraValueLines}
+                </div>
+            `;
+
             const buffsHtml = building.activeBuffs.length
                 ? `<div class="buff-list">${building.activeBuffs.map((buff, index) => `
                     <div class="buff-item ${selectedBuffIndex === index ? 'active' : ''}" data-buff-index="${index}">
@@ -3782,13 +3838,10 @@
                             <input class="details-color-input" type="color" value="${colorToHex(getBuildingBaseColor(building))}" aria-label="选择建筑背景颜色">
                         </div>
                     </div>
-                    <div class="details-meta">坐标：(${building.x}, ${building.y})</div>
-                    <div class="details-meta">尺寸：${building.w} x ${building.h}</div>
-                    <div class="details-meta">旋转：${building.rot}°</div>
-                    <div class="details-meta">Buff 数量：${building.activeBuffs.length}</div>
-                    <div class="details-meta">总地价加成：+${building.landBuff}</div>
-                    <div class="details-meta">总商品加成：+${building.commodityBuff}</div>
-                    ${extraValueLines}
+                    <div class="details-main-grid ${baseAttrEntries.length ? '' : 'single'}">
+                        ${detailsInfoHtml}
+                        ${baseAttrHtml}
+                    </div>
                 </div>
                 ${buffsHtml}
             `;
