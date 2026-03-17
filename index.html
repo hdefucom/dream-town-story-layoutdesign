@@ -3497,6 +3497,7 @@
         function paintRoadCell(x, y) {
             if (x < 0 || y < 0 || x >= cols || y >= rows) return false;
             if (isCellCoveredByBuilding(x, y)) return false;
+            if (!canOccupyOnMapOverlay(x, y, 1, 1, 0)) return false;
             const index = getRoadCellIndex(x, y);
             if (roadCells.has(index)) return false;
             roadCells.add(index);
