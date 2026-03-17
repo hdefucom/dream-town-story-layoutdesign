@@ -1930,16 +1930,18 @@
             const total = cols * rows;
             const blocked = new Uint8Array(total);
 
-            // 背景障碍：map 中非白色格子
-            const gridInfo = (mapColorData && mapColorData.grid) || {};
-            const mapCols = Math.min(cols, Number(gridInfo.cols) || 0);
-            const mapRows = Math.min(rows, Number(gridInfo.rows) || 0);
-            for (let y = 0; y < mapRows; y++) {
-                for (let x = 0; x < mapCols; x++) {
-                    const color = getMapColorForCell(x, y);
-                    const normalized = String(color || '').trim().toUpperCase();
-                    if (normalized && normalized !== '#FFFFFF') {
-                        blocked[y * cols + x] = 1;
+            // 背景障碍：仅在地图开关开启时，map 中非白色格子视为障碍
+            if (mapColorEnabled) {
+                const gridInfo = (mapColorData && mapColorData.grid) || {};
+                const mapCols = Math.min(cols, Number(gridInfo.cols) || 0);
+                const mapRows = Math.min(rows, Number(gridInfo.rows) || 0);
+                for (let y = 0; y < mapRows; y++) {
+                    for (let x = 0; x < mapCols; x++) {
+                        const color = getMapColorForCell(x, y);
+                        const normalized = String(color || '').trim().toUpperCase();
+                        if (normalized && normalized !== '#FFFFFF') {
+                            blocked[y * cols + x] = 1;
+                        }
                     }
                 }
             }
