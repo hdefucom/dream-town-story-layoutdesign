@@ -1058,6 +1058,16 @@
             justify-content: center;
             z-index: 10000;
         }
+        #toolsDataOverlay,
+        #rankDataOverlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
         #buffDataTable {
             table-layout: auto;
             min-width: unset;
@@ -1170,6 +1180,28 @@
         }
         #storeDataDialog {
             width: min(1013px, calc(100vw - 24px));
+            max-height: calc(100vh - 48px);
+            overflow: auto;
+            background: #fff;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2);
+            padding: 16px;
+            box-sizing: border-box;
+        }
+        #toolsDataDialog {
+            width: min(1360px, calc(100vw - 24px));
+            max-height: calc(100vh - 48px);
+            overflow: auto;
+            background: #fff;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2);
+            padding: 16px;
+            box-sizing: border-box;
+        }
+        #rankDataDialog {
+            width: min(1320px, calc(100vw - 24px));
             max-height: calc(100vh - 48px);
             overflow: auto;
             background: #fff;
@@ -1346,6 +1378,67 @@
             border: 1px solid rgba(150, 150, 150, 0.26);
             font-size: 12px;
             color: #7a7a7a;
+        }
+        .tools-layout {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+        .tools-bottom-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .tools-section-title,
+        .rank-section-title {
+            margin: 0 0 8px;
+            font-weight: 700;
+            color: #7a654a;
+        }
+        #toolsVehiclesCellTable,
+        #toolsVehiclesTable,
+        #toolsPetsTable,
+        #rankWorldBattleTable,
+        #rankCoopLandTable,
+        #rankCityBonusTable {
+            width: 100%;
+            min-width: 0;
+            table-layout: auto;
+        }
+        #toolsVehiclesCellTable tbody td {
+            white-space: nowrap;
+            text-align: center;
+            padding: 8px 10px;
+            background: rgba(240, 231, 216, 0.38);
+            border-right: 1px solid rgba(122, 103, 74, 0.16);
+        }
+        #toolsVehiclesCellTable tbody td:last-child {
+            border-right: 0;
+        }
+        #toolsVehiclesTable tbody td:nth-child(2),
+        #toolsPetsTable tbody td:nth-child(2),
+        #rankWorldBattleTable tbody td:nth-child(2),
+        #rankCoopLandTable tbody td:nth-child(2),
+        #rankCityBonusTable tbody td {
+            text-align: left;
+            white-space: normal;
+            word-break: break-all;
+        }
+        .rank-data-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 12px;
+        }
+        .rank-right-column {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+        @media (max-width: 1080px) {
+            .tools-bottom-grid,
+            .rank-data-grid {
+                grid-template-columns: 1fr;
+            }
         }
         .occupation-group-row td {
             padding: 0;
@@ -1894,6 +1987,8 @@
                 <button id="openBuffDataBtn" type="button" class="base-data-open-btn">专业街</button>
                 <button id="openOccupationDataBtn" type="button" class="base-data-open-btn">职业勋章</button>
                 <button id="openStoreDataBtn" type="button" class="base-data-open-btn">商店</button>
+                <button id="openToolsDataBtn" type="button" class="base-data-open-btn">交通/宠物</button>
+                <button id="openRankDataBtn" type="button" class="base-data-open-btn">排名奖励</button>
             </div>
         </div>
         <h3>建筑列表</h3>
@@ -2214,11 +2309,129 @@
             </div>
         </div>
     </div>
+    <div id="toolsDataOverlay" role="dialog" aria-modal="true" aria-labelledby="toolsDataTitle">
+        <div id="toolsDataDialog">
+            <div class="base-data-header">
+                <div id="toolsDataTitle" class="base-data-title">交通/宠物</div>
+                <button id="toolsDataCloseBtn" type="button">关闭</button>
+            </div>
+            <div id="toolsDataTotal" class="base-data-total">交通工具栏位 0 条，交通工具 0 条，宠物 0 条</div>
+            <div class="base-data-search-bar">
+                <input id="toolsDataSearchInput" class="base-data-search-input" type="text" placeholder="搜索名称、建筑或效果" autocomplete="off" />
+            </div>
+            <div class="tools-layout">
+                <div class="tools-section">
+                    <div class="tools-section-title">交通工具栏位</div>
+                    <div class="base-data-table-wrap">
+                        <table class="base-data-table" id="toolsVehiclesCellTable">
+                            <tbody id="toolsVehiclesCellBody"></tbody>
+                        </table>
+                        <div id="toolsVehiclesCellEmpty" class="base-data-table-empty" style="display:none;">暂无交通工具栏位数据。</div>
+                    </div>
+                </div>
+                <div class="tools-bottom-grid">
+                    <div class="tools-section">
+                        <div class="tools-section-title">交通工具</div>
+                        <div class="base-data-table-wrap">
+                            <table class="base-data-table" id="toolsVehiclesTable">
+                                <thead>
+                                    <tr>
+                                        <th>名称</th>
+                                        <th>建筑</th>
+                                        <th>效果</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="toolsVehiclesBody"></tbody>
+                            </table>
+                            <div id="toolsVehiclesEmpty" class="base-data-table-empty" style="display:none;">暂无交通工具数据。</div>
+                        </div>
+                    </div>
+                    <div class="tools-section">
+                        <div class="tools-section-title">宠物</div>
+                        <div class="base-data-table-wrap">
+                            <table class="base-data-table" id="toolsPetsTable">
+                                <thead>
+                                    <tr>
+                                        <th>名称</th>
+                                        <th>建筑</th>
+                                        <th>效果</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="toolsPetsBody"></tbody>
+                            </table>
+                            <div id="toolsPetsEmpty" class="base-data-table-empty" style="display:none;">暂无宠物数据。</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="rankDataOverlay" role="dialog" aria-modal="true" aria-labelledby="rankDataTitle">
+        <div id="rankDataDialog">
+            <div class="base-data-header">
+                <div id="rankDataTitle" class="base-data-title">排名奖励</div>
+                <button id="rankDataCloseBtn" type="button">关闭</button>
+            </div>
+            <div id="rankDataTotal" class="base-data-total">世界战斗 0 条，协力地价 0 条，邻市 0 条</div>
+            <div class="rank-data-grid">
+                <div class="rank-section">
+                    <div class="rank-section-title">世界战斗</div>
+                    <div class="base-data-table-wrap">
+                        <table class="base-data-table" id="rankWorldBattleTable">
+                            <thead>
+                                <tr>
+                                    <th>等级</th>
+                                    <th>奖励</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rankWorldBattleBody"></tbody>
+                        </table>
+                        <div id="rankWorldBattleEmpty" class="base-data-table-empty" style="display:none;">暂无世界战斗数据。</div>
+                    </div>
+                </div>
+                <div class="rank-right-column">
+                    <div class="rank-section">
+                        <div class="rank-section-title">协力地价</div>
+                        <div class="base-data-table-wrap">
+                            <table class="base-data-table" id="rankCoopLandTable">
+                                <thead>
+                                    <tr>
+                                        <th>排名</th>
+                                        <th>奖励</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rankCoopLandBody"></tbody>
+                            </table>
+                            <div id="rankCoopLandEmpty" class="base-data-table-empty" style="display:none;">暂无协力地价数据。</div>
+                        </div>
+                    </div>
+                    <div class="rank-section">
+                        <div class="rank-section-title">邻市</div>
+                        <div class="base-data-table-wrap">
+                            <table class="base-data-table" id="rankCityBonusTable">
+                                <thead>
+                                    <tr>
+                                        <th>建筑1</th>
+                                        <th>建筑2</th>
+                                        <th>奖励</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rankCityBonusBody"></tbody>
+                            </table>
+                            <div id="rankCityBonusEmpty" class="base-data-table-empty" style="display:none;">暂无邻市数据。</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         const cols = 200, rows = 200, cellSize = 40;
         let buildData = [], buffData = [], occupationData = [], layoutsData = [];
         let storeData = { box: [], buy: [] };
+        let toolsData = { vehiclesCell: [], vehicles: [], pets: [] };
+        let rankData = { world_battle: [], coop_land: [], city_bonus: [] };
         let mapColorData = null;
         let mapColorEnabled = false;
         let gridLineDarkMode = false;
@@ -2245,6 +2458,8 @@
         let buffDataVisible = false;
         let occupationDataVisible = false;
         let storeDataVisible = false;
+        let toolsDataVisible = false;
+        let rankDataVisible = false;
         let buffDataSortState = { key: '', direction: 'asc' };
         let buffDataViewMode = 'rule';
         let buffDataSearchQuery = '';
@@ -2254,6 +2469,7 @@
         let baseDataCollapsedTypes = new Set();
         let occupationSearchQuery = '';
         let storeSearchQuery = '';
+        let toolsSearchQuery = '';
         let occupationCollapsedLevels = new Set();
         let statsCollapsedGroups = new Set();
         let hoverClientX = null;
@@ -2355,6 +2571,8 @@
             document.getElementById('openBuffDataBtn').addEventListener('click', showBuffData);
             document.getElementById('openOccupationDataBtn').addEventListener('click', showOccupationData);
             document.getElementById('openStoreDataBtn').addEventListener('click', showStoreData);
+            document.getElementById('openToolsDataBtn').addEventListener('click', showToolsData);
+            document.getElementById('openRankDataBtn').addEventListener('click', showRankData);
             document.getElementById('buffDataViewToggleBtn').addEventListener('click', () => {
                 buffDataViewMode = buffDataViewMode === 'rule' ? 'building' : 'rule';
                 renderBuffDataTable();
@@ -2371,6 +2589,10 @@
                 storeSearchQuery = String(event.target.value || '');
                 renderStoreDataTables();
             });
+            document.getElementById('toolsDataSearchInput').addEventListener('input', (event) => {
+                toolsSearchQuery = String(event.target.value || '');
+                renderToolsDataTables();
+            });
             document.getElementById('pathCreateRoadBtn').addEventListener('click', createRoadFromShortestPath);
             document.getElementById('paletteToggleBtn').addEventListener('click', () => togglePanel('palette'));
             document.getElementById('detailsToggleBtn').addEventListener('click', () => togglePanel('details'));
@@ -2386,6 +2608,8 @@
             document.getElementById('buffDataCloseBtn').addEventListener('click', closeBuffData);
             document.getElementById('occupationDataCloseBtn').addEventListener('click', closeOccupationData);
             document.getElementById('storeDataCloseBtn').addEventListener('click', closeStoreData);
+            document.getElementById('toolsDataCloseBtn').addEventListener('click', closeToolsData);
+            document.getElementById('rankDataCloseBtn').addEventListener('click', closeRankData);
             document.getElementById('statsOverlay').addEventListener('click', (event) => {
                 if (event.target === document.getElementById('statsOverlay')) {
                     closeStats();
@@ -2409,6 +2633,16 @@
             document.getElementById('storeDataOverlay').addEventListener('click', (event) => {
                 if (event.target === document.getElementById('storeDataOverlay')) {
                     closeStoreData();
+                }
+            });
+            document.getElementById('toolsDataOverlay').addEventListener('click', (event) => {
+                if (event.target === document.getElementById('toolsDataOverlay')) {
+                    closeToolsData();
+                }
+            });
+            document.getElementById('rankDataOverlay').addEventListener('click', (event) => {
+                if (event.target === document.getElementById('rankDataOverlay')) {
+                    closeRankData();
                 }
             });
             document.getElementById('occupationDataTableBody').addEventListener('click', (event) => {
@@ -3969,6 +4203,32 @@
             }).catch(err => {
                 console.warn('load store data error', err);
             });
+            fetchJsonNoCache('metadata/tools.json').then(data=>{
+                const nextData = data && typeof data === 'object' ? data : {};
+                toolsData = {
+                    vehiclesCell: Array.isArray(nextData.vehiclesCell) ? nextData.vehiclesCell : [],
+                    vehicles: Array.isArray(nextData.vehicles) ? nextData.vehicles : [],
+                    pets: Array.isArray(nextData.pets) ? nextData.pets : []
+                };
+                if (toolsDataVisible) {
+                    renderToolsDataTables();
+                }
+            }).catch(err => {
+                console.warn('load tools data error', err);
+            });
+            fetchJsonNoCache('metadata/rank.json').then(data=>{
+                const nextData = data && typeof data === 'object' ? data : {};
+                rankData = {
+                    world_battle: Array.isArray(nextData.world_battle) ? nextData.world_battle : [],
+                    coop_land: Array.isArray(nextData.coop_land) ? nextData.coop_land : [],
+                    city_bonus: Array.isArray(nextData.city_bonus) ? nextData.city_bonus : []
+                };
+                if (rankDataVisible) {
+                    renderRankDataTables();
+                }
+            }).catch(err => {
+                console.warn('load rank data error', err);
+            });
             fetchJsonNoCache('layouts.json').then(data=>{
                 layoutsData = data;
                 populateLayouts();
@@ -5402,7 +5662,7 @@
                 return;
             }
 
-            if ((manualVisible || statsVisible || baseDataVisible || buffDataVisible || occupationDataVisible || storeDataVisible) && e.key !== 'Escape') {
+            if ((manualVisible || statsVisible || baseDataVisible || buffDataVisible || occupationDataVisible || storeDataVisible || toolsDataVisible || rankDataVisible) && e.key !== 'Escape') {
                 return;
             }
 
@@ -5415,6 +5675,14 @@
             }
 
             if (e.key === 'Escape') {
+                if (rankDataVisible) {
+                    closeRankData();
+                    return;
+                }
+                if (toolsDataVisible) {
+                    closeToolsData();
+                    return;
+                }
                 if (storeDataVisible) {
                     closeStoreData();
                     return;
@@ -5954,6 +6222,8 @@
             closeStats();
             closeOccupationData();
             closeStoreData();
+            closeToolsData();
+            closeRankData();
             const overlay = document.getElementById('baseDataOverlay');
             if (!overlay) return;
             renderBaseDataTable();
@@ -6075,6 +6345,8 @@
             closeBaseData();
             closeBuffData();
             closeStoreData();
+            closeToolsData();
+            closeRankData();
             const overlay = document.getElementById('occupationDataOverlay');
             if (!overlay) return;
             renderOccupationDataTable();
@@ -6213,6 +6485,8 @@
             closeBaseData();
             closeBuffData();
             closeOccupationData();
+            closeToolsData();
+            closeRankData();
             const overlay = document.getElementById('storeDataOverlay');
             if (!overlay) return;
             renderStoreDataTables();
@@ -6225,6 +6499,180 @@
             if (!overlay) return;
             overlay.style.display = 'none';
             storeDataVisible = false;
+        }
+
+        function renderToolsDataTables() {
+            const totalEl = document.getElementById('toolsDataTotal');
+            const searchInput = document.getElementById('toolsDataSearchInput');
+            const vehiclesCellBody = document.getElementById('toolsVehiclesCellBody');
+            const vehiclesBody = document.getElementById('toolsVehiclesBody');
+            const petsBody = document.getElementById('toolsPetsBody');
+            const vehiclesCellEmpty = document.getElementById('toolsVehiclesCellEmpty');
+            const vehiclesEmpty = document.getElementById('toolsVehiclesEmpty');
+            const petsEmpty = document.getElementById('toolsPetsEmpty');
+            if (!totalEl || !vehiclesCellBody || !vehiclesBody || !petsBody || !vehiclesCellEmpty || !vehiclesEmpty || !petsEmpty) return;
+
+            if (searchInput && searchInput.value !== toolsSearchQuery) {
+                searchInput.value = toolsSearchQuery;
+            }
+
+            const keyword = normalizeBuildingName(toolsSearchQuery).toLocaleLowerCase('zh-Hans-CN');
+            const vehiclesCell = Array.isArray(toolsData?.vehiclesCell) ? toolsData.vehiclesCell : [];
+            const vehicles = Array.isArray(toolsData?.vehicles) ? toolsData.vehicles : [];
+            const pets = Array.isArray(toolsData?.pets) ? toolsData.pets : [];
+
+            const filteredVehiclesCell = keyword
+                ? vehiclesCell.filter(name => normalizeBuildingName(name).toLocaleLowerCase('zh-Hans-CN').includes(keyword))
+                : vehiclesCell;
+
+            const filterRow = (row) => {
+                if (!keyword) return true;
+                const terms = [row?.name, row?.build, row?.effect];
+                return terms.some(term => normalizeBuildingName(term).toLocaleLowerCase('zh-Hans-CN').includes(keyword));
+            };
+            const filteredVehicles = vehicles.filter(filterRow);
+            const filteredPets = pets.filter(filterRow);
+
+            totalEl.textContent = keyword
+                ? `匹配：交通工具栏位 ${filteredVehiclesCell.length} 条，交通工具 ${filteredVehicles.length} 条，宠物 ${filteredPets.length} 条`
+                : `交通工具栏位 ${filteredVehiclesCell.length} 条，交通工具 ${filteredVehicles.length} 条，宠物 ${filteredPets.length} 条`;
+
+            if (filteredVehiclesCell.length) {
+                vehiclesCellBody.innerHTML = `<tr>${filteredVehiclesCell.map(item => `<td>${escapeHtml(String(item || ''))}</td>`).join('')}</tr>`;
+                vehiclesCellEmpty.style.display = 'none';
+            } else {
+                vehiclesCellBody.innerHTML = '';
+                vehiclesCellEmpty.textContent = keyword ? '未找到匹配数据。' : '暂无交通工具栏位数据。';
+                vehiclesCellEmpty.style.display = 'block';
+            }
+
+            if (filteredVehicles.length) {
+                vehiclesBody.innerHTML = filteredVehicles.map(item => `<tr>
+                    <td>${escapeHtml(String(item?.name ?? ''))}</td>
+                    <td>${escapeHtml(String(item?.build ?? ''))}</td>
+                    <td>${escapeHtml(String(item?.effect ?? ''))}</td>
+                </tr>`).join('');
+                vehiclesEmpty.style.display = 'none';
+            } else {
+                vehiclesBody.innerHTML = '';
+                vehiclesEmpty.textContent = keyword ? '未找到匹配数据。' : '暂无交通工具数据。';
+                vehiclesEmpty.style.display = 'block';
+            }
+
+            if (filteredPets.length) {
+                petsBody.innerHTML = filteredPets.map(item => `<tr>
+                    <td>${escapeHtml(String(item?.name ?? ''))}</td>
+                    <td>${escapeHtml(String(item?.build ?? ''))}</td>
+                    <td>${escapeHtml(String(item?.effect ?? ''))}</td>
+                </tr>`).join('');
+                petsEmpty.style.display = 'none';
+            } else {
+                petsBody.innerHTML = '';
+                petsEmpty.textContent = keyword ? '未找到匹配数据。' : '暂无宠物数据。';
+                petsEmpty.style.display = 'block';
+            }
+        }
+
+        function showToolsData() {
+            clearSameBuildingHighlight();
+            closePanels();
+            closeManual();
+            closeStats();
+            closeBaseData();
+            closeBuffData();
+            closeOccupationData();
+            closeStoreData();
+            closeRankData();
+            const overlay = document.getElementById('toolsDataOverlay');
+            if (!overlay) return;
+            renderToolsDataTables();
+            overlay.style.display = 'flex';
+            toolsDataVisible = true;
+        }
+
+        function closeToolsData() {
+            const overlay = document.getElementById('toolsDataOverlay');
+            if (!overlay) return;
+            overlay.style.display = 'none';
+            toolsDataVisible = false;
+        }
+
+        function renderRankDataTables() {
+            const totalEl = document.getElementById('rankDataTotal');
+            const worldBody = document.getElementById('rankWorldBattleBody');
+            const coopBody = document.getElementById('rankCoopLandBody');
+            const cityBody = document.getElementById('rankCityBonusBody');
+            const worldEmpty = document.getElementById('rankWorldBattleEmpty');
+            const coopEmpty = document.getElementById('rankCoopLandEmpty');
+            const cityEmpty = document.getElementById('rankCityBonusEmpty');
+            if (!totalEl || !worldBody || !coopBody || !cityBody || !worldEmpty || !coopEmpty || !cityEmpty) return;
+
+            const worldRows = Array.isArray(rankData?.world_battle) ? rankData.world_battle : [];
+            const coopRows = Array.isArray(rankData?.coop_land) ? rankData.coop_land : [];
+            const cityRows = Array.isArray(rankData?.city_bonus) ? rankData.city_bonus : [];
+
+            totalEl.textContent = `世界战斗 ${worldRows.length} 条，协力地价 ${coopRows.length} 条，邻市 ${cityRows.length} 条`;
+
+            if (worldRows.length) {
+                worldBody.innerHTML = worldRows.map(item => `<tr>
+                    <td>${escapeHtml(String(item?.level ?? ''))}</td>
+                    <td>${escapeHtml(String(item?.reward ?? ''))}</td>
+                </tr>`).join('');
+                worldEmpty.style.display = 'none';
+            } else {
+                worldBody.innerHTML = '';
+                worldEmpty.style.display = 'block';
+            }
+
+            if (coopRows.length) {
+                coopBody.innerHTML = coopRows.map(item => `<tr>
+                    <td>${escapeHtml(String(item?.rank ?? ''))}</td>
+                    <td>${escapeHtml(String(item?.reward ?? ''))}</td>
+                </tr>`).join('');
+                coopEmpty.style.display = 'none';
+            } else {
+                coopBody.innerHTML = '';
+                coopEmpty.style.display = 'block';
+            }
+
+            if (cityRows.length) {
+                cityBody.innerHTML = cityRows.map(item => {
+                    const row = Array.isArray(item) ? item : [];
+                    return `<tr>
+                        <td>${escapeHtml(String(row[0] ?? ''))}</td>
+                        <td>${escapeHtml(String(row[1] ?? ''))}</td>
+                        <td>${escapeHtml(String(row[2] ?? ''))}</td>
+                    </tr>`;
+                }).join('');
+                cityEmpty.style.display = 'none';
+            } else {
+                cityBody.innerHTML = '';
+                cityEmpty.style.display = 'block';
+            }
+        }
+
+        function showRankData() {
+            clearSameBuildingHighlight();
+            closePanels();
+            closeManual();
+            closeStats();
+            closeBaseData();
+            closeBuffData();
+            closeOccupationData();
+            closeStoreData();
+            closeToolsData();
+            const overlay = document.getElementById('rankDataOverlay');
+            if (!overlay) return;
+            renderRankDataTables();
+            overlay.style.display = 'flex';
+            rankDataVisible = true;
+        }
+
+        function closeRankData() {
+            const overlay = document.getElementById('rankDataOverlay');
+            if (!overlay) return;
+            overlay.style.display = 'none';
+            rankDataVisible = false;
         }
 
         function getBuffRuleOccurrences(rule) {
@@ -6564,6 +7012,8 @@
             closeBaseData();
             closeOccupationData();
             closeStoreData();
+            closeToolsData();
+            closeRankData();
             const overlay = document.getElementById('buffDataOverlay');
             if (!overlay) return;
             renderBuffDataTable();
@@ -6732,6 +7182,10 @@
             closePanels();
             closeBaseData();
             closeBuffData();
+            closeOccupationData();
+            closeStoreData();
+            closeToolsData();
+            closeRankData();
             const overlay = document.getElementById('statsOverlay');
             if (!overlay) return;
             renderStats();
