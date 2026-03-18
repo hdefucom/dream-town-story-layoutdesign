@@ -2431,7 +2431,7 @@
         let buildData = [], buffData = [], occupationData = [], layoutsData = [];
         let storeData = { box: [], buy: [] };
         let toolsData = { vehiclesCell: [], vehicles: [], pets: [] };
-        let rankData = { world_battle: [], coop_land: [], city_bonus: [] };
+        let rankData = { world_battle: [], coop_land: [], city_bonus: [], city_bouns_battle: {} };
         let mapColorData = null;
         let mapColorEnabled = false;
         let gridLineDarkMode = false;
@@ -4221,7 +4221,10 @@
                 rankData = {
                     world_battle: Array.isArray(nextData.world_battle) ? nextData.world_battle : [],
                     coop_land: Array.isArray(nextData.coop_land) ? nextData.coop_land : [],
-                    city_bonus: Array.isArray(nextData.city_bonus) ? nextData.city_bonus : []
+                    city_bonus: Array.isArray(nextData.city_bonus) ? nextData.city_bonus : [],
+                    city_bouns_battle: (nextData.city_bouns_battle && typeof nextData.city_bouns_battle === 'object')
+                        ? nextData.city_bouns_battle
+                        : {}
                 };
                 if (rankDataVisible) {
                     renderRankDataTables();
@@ -6610,6 +6613,9 @@
             const worldRows = Array.isArray(rankData?.world_battle) ? rankData.world_battle : [];
             const coopRows = Array.isArray(rankData?.coop_land) ? rankData.coop_land : [];
             const cityRows = Array.isArray(rankData?.city_bonus) ? rankData.city_bonus : [];
+            const cityBounsBattleMap = (rankData?.city_bouns_battle && typeof rankData.city_bouns_battle === 'object')
+                ? rankData.city_bouns_battle
+                : {};
 
             totalEl.textContent = `世界战斗 ${worldRows.length} 条，协力地价 ${coopRows.length} 条，邻市 ${cityRows.length} 条`;
 
@@ -6638,10 +6644,17 @@
             if (cityRows.length) {
                 cityBody.innerHTML = cityRows.map(item => {
                     const row = Array.isArray(item) ? item : [];
+                    const rewardKey = String(row[2] ?? '');
+                    const appendValue = Object.prototype.hasOwnProperty.call(cityBounsBattleMap, rewardKey)
+                        ? String(cityBounsBattleMap[rewardKey] ?? '').trim()
+                        : '';
+                    const rewardText = appendValue
+                        ? `${rewardKey}（${appendValue}）`
+                        : rewardKey;
                     return `<tr>
                         <td>${escapeHtml(String(row[0] ?? ''))}</td>
                         <td>${escapeHtml(String(row[1] ?? ''))}</td>
-                        <td>${escapeHtml(String(row[2] ?? ''))}</td>
+                        <td>${escapeHtml(rewardText)}</td>
                     </tr>`;
                 }).join('');
                 cityEmpty.style.display = 'none';
