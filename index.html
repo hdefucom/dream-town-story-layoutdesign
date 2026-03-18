@@ -420,6 +420,53 @@
             pointer-events: none;
             z-index: 6;
         }
+        #selectedScopeLayer {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 4;
+        }
+        .selected-scope-cell {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border: 2px solid rgba(0, 119, 255, 0.92);
+            background:
+                linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.02)),
+                rgba(0, 170, 255, 0.34);
+            box-shadow:
+                inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+                0 0 0 1px rgba(0, 95, 204, 0.42),
+                0 0 14px rgba(0, 174, 255, 0.62),
+                0 0 28px rgba(0, 132, 255, 0.34);
+            animation: selected-scope-pulse 0.92s ease-in-out infinite;
+        }
+        @keyframes selected-scope-pulse {
+            0%, 100% {
+                transform: scale(1);
+                background:
+                    linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.02)),
+                    rgba(0, 170, 255, 0.3);
+                border-color: rgba(0, 119, 255, 0.82);
+                box-shadow:
+                    inset 0 0 0 1px rgba(255, 255, 255, 0.48),
+                    0 0 0 1px rgba(0, 95, 204, 0.38),
+                    0 0 12px rgba(0, 174, 255, 0.55),
+                    0 0 22px rgba(0, 132, 255, 0.28);
+            }
+            50% {
+                transform: scale(1.05);
+                background:
+                    linear-gradient(135deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.04)),
+                    rgba(0, 195, 255, 0.5);
+                border-color: rgba(0, 90, 255, 1);
+                box-shadow:
+                    inset 0 0 0 1px rgba(255, 255, 255, 0.72),
+                    0 0 0 2px rgba(0, 119, 255, 0.52),
+                    0 0 18px rgba(0, 204, 255, 0.82),
+                    0 0 38px rgba(0, 132, 255, 0.46);
+            }
+        }
         .shortest-path-cell {
             position: absolute;
             width: 40px;
@@ -603,6 +650,34 @@
                     0 14px 28px rgba(173, 52, 20, 0.5);
             }
         }
+            .placed.land-source-focus {
+                border-color: #1565c0 !important;
+                outline: 3px solid #81d4fa;
+                outline-offset: -2px;
+                box-shadow:
+                    0 0 0 3px rgba(255, 255, 255, 0.96),
+                    0 0 0 8px rgba(21, 101, 192, 0.76),
+                    0 0 22px 8px rgba(79, 195, 247, 0.72),
+                    0 10px 24px rgba(21, 101, 192, 0.34) !important;
+                z-index: 5;
+                animation: land-source-focus-pulse 0.95s ease-in-out 2;
+            }
+            @keyframes land-source-focus-pulse {
+                0%, 100% {
+                    box-shadow:
+                        0 0 0 3px rgba(255, 255, 255, 0.96),
+                        0 0 0 8px rgba(21, 101, 192, 0.76),
+                        0 0 22px 8px rgba(79, 195, 247, 0.72),
+                        0 10px 24px rgba(21, 101, 192, 0.34);
+                }
+                50% {
+                    box-shadow:
+                        0 0 0 3px rgba(255, 255, 255, 1),
+                        0 0 0 10px rgba(21, 101, 192, 0.9),
+                        0 0 30px 12px rgba(79, 195, 247, 0.9),
+                        0 12px 30px rgba(21, 101, 192, 0.45);
+                }
+            }
         .placed.buff-source {
             border-color: #c62828;
             box-shadow:
@@ -775,6 +850,45 @@
         .buff-item.active { border-color: #2e7d32; background: #edf7ee; }
         .buff-item-title { font-size: 13px; font-weight: bold; margin-bottom: 6px; }
         .buff-item-line { font-size: 12px; color: #444; line-height: 1.5; }
+        .area-land-add-item {
+            cursor: pointer;
+        }
+        .area-land-add-item:hover {
+            border-color: rgba(25, 103, 210, 0.34);
+            background: #f2f7ff;
+        }
+        .details-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .details-tab-btn {
+            flex: 1;
+            border: 1px solid rgba(122, 103, 74, 0.2);
+            background: #f6f4f0;
+            color: #4b443b;
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.14s ease;
+        }
+        .details-tab-btn:hover {
+            border-color: rgba(29, 107, 87, 0.35);
+            background: #f0f8f6;
+        }
+        .details-tab-btn.active {
+            background: #2e7d32;
+            border-color: #2e7d32;
+            color: #fff;
+        }
+        .details-tab-panel {
+            display: none;
+        }
+        .details-tab-panel.active {
+            display: block;
+        }
 
         #mobileActionBar {
             display: none;
@@ -2450,6 +2564,8 @@
         let selectedBuffIndex = null;
         let highlightedBuffSourceIds = [];
         let highlightedBuffLabel = '';
+        let temporaryScopeBuildingId = null;
+        let temporaryScopeBuildingTimer = null;
         let sameHighlightEnabled = false;
         let highlightedSameBuildingIds = [];
         let nextPlacedId = 0;
@@ -2755,6 +2871,7 @@
                 grid.appendChild(c);
             }
             createShortestPathLayer();
+            createSelectedScopeLayer();
             createMapSectionLinesSVG();
 
             grid.addEventListener('dragover', e => e.preventDefault());
@@ -3307,6 +3424,73 @@
             const layer = document.createElement('div');
             layer.id = 'shortestPathLayer';
             grid.appendChild(layer);
+        }
+
+        function createSelectedScopeLayer() {
+            const grid = document.getElementById('grid');
+            if (!grid || document.getElementById('selectedScopeLayer')) return;
+            const layer = document.createElement('div');
+            layer.id = 'selectedScopeLayer';
+            grid.appendChild(layer);
+        }
+
+        function clearSelectedScopeEffect() {
+            const layer = document.getElementById('selectedScopeLayer');
+            if (layer) {
+                layer.innerHTML = '';
+            }
+        }
+
+        function renderSelectedScopeEffect() {
+            const layer = document.getElementById('selectedScopeLayer');
+            if (!layer) return;
+            layer.innerHTML = '';
+
+            let building = null;
+            if (temporaryScopeBuildingId !== null) {
+                building = getPlacedById(temporaryScopeBuildingId);
+            }
+            if (!building && selectedBuildingId !== null && selectedBuildingIds.size === 1) {
+                building = getSelectedBuilding();
+            }
+            if (!building) return;
+
+            const buildingSource = getBuildDefinitionByName(building.name);
+            const scope = Number(buildingSource?.scope);
+            if (!Number.isFinite(scope) || scope <= 0) {
+                return;
+            }
+
+            const [width, height] = getBuildingRotatedSize(building);
+            const left = building.x;
+            const top = building.y;
+            const right = building.x + width - 1;
+            const bottom = building.y + height - 1;
+
+            const minX = Math.max(0, left - scope);
+            const maxX = Math.min(cols - 1, right + scope);
+            const minY = Math.max(0, top - scope);
+            const maxY = Math.min(rows - 1, bottom + scope);
+            const fragment = document.createDocumentFragment();
+
+            for (let y = minY; y <= maxY; y++) {
+                for (let x = minX; x <= maxX; x++) {
+                    const dx = x < left ? (left - x) : (x > right ? (x - right) : 0);
+                    const dy = y < top ? (top - y) : (y > bottom ? (y - bottom) : 0);
+                    const distance = dx + dy;
+
+                    // Exclude the building footprint itself; scope starts outside own size.
+                    if (distance === 0 || distance > scope) continue;
+
+                    const cell = document.createElement('div');
+                    cell.className = 'selected-scope-cell';
+                    cell.style.left = `${x * cellSize}px`;
+                    cell.style.top = `${y * cellSize}px`;
+                    fragment.appendChild(cell);
+                }
+            }
+
+            layer.appendChild(fragment);
         }
 
         function clearShortestPathDisplay() {
@@ -4474,7 +4658,21 @@
             }
             
             const id = nextPlacedId++;
-            const obj = {id, name, x: finalX, y: finalY, w, h, rot, customColor, landBuff: 0, commodityBuff: 0, activeBuffs: []};
+            const obj = {
+                id,
+                name,
+                x: finalX,
+                y: finalY,
+                w,
+                h,
+                rot,
+                customColor,
+                landBuff: 0,
+                commodityBuff: 0,
+                activeBuffs: [],
+                areaLandAddBuff: 0,
+                areaLandAddSources: []
+            };
             clearRoadCellsUnderFootprint(finalX, finalY, w, h, rot);
             placed.push(obj);
             renderBuilding(obj, renderTarget);
@@ -4526,9 +4724,15 @@
             } else {
                 selectedBuildingId = ids[0];
             }
+            if (temporaryScopeBuildingTimer) {
+                clearTimeout(temporaryScopeBuildingTimer);
+                temporaryScopeBuildingTimer = null;
+            }
+            temporaryScopeBuildingId = null;
             clearBuffHighlight();
             updateSiblingSwitchButtons();
             renderBuildingDetails(getSelectedBuilding());
+            renderSelectedScopeEffect();
         }
 
         function clearBuffHighlight() {
@@ -4713,6 +4917,37 @@
             });
         }
 
+        function flashBuildingFocus(id) {
+            const buildingElement = document.querySelector(`.placed[data-id='${id}']`);
+            if (!buildingElement) return;
+            buildingElement.classList.remove('land-source-focus');
+            // Force reflow so repeated clicks can restart the animation.
+            void buildingElement.offsetWidth;
+            buildingElement.classList.add('land-source-focus');
+            setTimeout(() => {
+                buildingElement.classList.remove('land-source-focus');
+            }, 2100);
+        }
+
+        function flashScopeEffectForBuilding(id) {
+            const targetBuilding = getPlacedById(id);
+            if (!targetBuilding) return;
+            const targetSource = getBuildDefinitionByName(targetBuilding.name);
+            const scope = Number(targetSource?.scope);
+            if (!Number.isFinite(scope) || scope <= 0) return;
+
+            temporaryScopeBuildingId = id;
+            if (temporaryScopeBuildingTimer) {
+                clearTimeout(temporaryScopeBuildingTimer);
+            }
+            renderSelectedScopeEffect();
+            temporaryScopeBuildingTimer = setTimeout(() => {
+                temporaryScopeBuildingId = null;
+                temporaryScopeBuildingTimer = null;
+                renderSelectedScopeEffect();
+            }, 2100);
+        }
+
         function highlightBuffSources(buffIndex) {
             clearSameBuildingHighlight();
             const building = getSelectedBuilding();
@@ -4734,13 +4969,13 @@
                 return;
             }
 
-            const normalizeName = (value) => String(value || '').normalize('NFKC').trim();
-            const buildingSource = buildData.find(item => normalizeName(item.name) === normalizeName(building.name));
+            const buildingSource = getBuildDefinitionByName(building.name);
             const sourceLand = Number(buildingSource?.land);
             const sourceCommodity = Number(buildingSource?.commodity);
             const hasLand = Number.isFinite(sourceLand);
             const hasCommodity = Number.isFinite(sourceCommodity);
-            const landValue = hasLand ? (sourceLand * building.landBuff / 100) : null;
+            const areaLandAddBuff = Number(building.areaLandAddBuff) || 0;
+            const landValue = hasLand ? ((sourceLand * building.landBuff / 100) + areaLandAddBuff) : null;
             const commodityValue = hasCommodity ? (sourceCommodity * building.commodityBuff / 100) : null;
             const formatComputedValue = (value) => {
                 const rounded = Math.round(value * 100) / 100;
@@ -4777,6 +5012,7 @@
                     <div class="details-meta">Buff 数量：${building.activeBuffs.length}</div>
                     <div class="details-meta">总地价加成：+${building.landBuff}</div>
                     <div class="details-meta">总商品加成：+${building.commodityBuff}</div>
+                    <div class="details-meta">范围地价加成：+${areaLandAddBuff}</div>
                     ${extraValueLines}
                 </div>
             `;
@@ -4791,6 +5027,38 @@
                     </div>
                 `).join('')}</div>`
                 : '<div class="details-empty">当前没有生效的 buff。</div>';
+
+            const areaLandAddHtml = Array.isArray(building.areaLandAddSources) && building.areaLandAddSources.length
+                ? `<div class="buff-list">${building.areaLandAddSources.map((item, index) => `
+                    <div class="buff-item area-land-add-item" data-land-source-id="${item.sourceId}">
+                        <div class="buff-item-title">${escapeHtml(item.sourceName)}</div>
+                        <div class="buff-item-line">来源建筑：${escapeHtml(item.sourceName)}</div>
+                        <div class="buff-item-line">加成数值：+${item.landAdd}</div>
+                        <div class="buff-item-line">生效范围：菱形 ${item.scope} 格</div>
+                    </div>
+                `).join('')}</div>`
+                : '<div class="details-empty">当前没有生效的地价数值加成建筑。</div>';
+
+            const hasClassicBuffs = building.activeBuffs.length > 0;
+            const hasAreaLandAdd = Array.isArray(building.areaLandAddSources) && building.areaLandAddSources.length > 0;
+            const initialTab = hasClassicBuffs ? 'classic' : (hasAreaLandAdd ? 'landAdd' : 'classic');
+
+            const tabsHtml = `
+                <div class="details-tabs" role="tablist" aria-label="建筑明细列表切换">
+                    <button class="details-tab-btn ${initialTab === 'classic' ? 'active' : ''}" type="button" data-details-tab="classic" role="tab" aria-selected="${initialTab === 'classic' ? 'true' : 'false'}">
+                        Buff列表
+                    </button>
+                    <button class="details-tab-btn ${initialTab === 'landAdd' ? 'active' : ''}" type="button" data-details-tab="landAdd" role="tab" aria-selected="${initialTab === 'landAdd' ? 'true' : 'false'}">
+                        地价数值加成建筑
+                    </button>
+                </div>
+                <div class="details-tab-panel ${initialTab === 'classic' ? 'active' : ''}" data-details-panel="classic" role="tabpanel">
+                    ${buffsHtml}
+                </div>
+                <div class="details-tab-panel ${initialTab === 'landAdd' ? 'active' : ''}" data-details-panel="landAdd" role="tabpanel">
+                    ${areaLandAddHtml}
+                </div>
+            `;
 
             detailsContent.className = '';
             detailsContent.innerHTML = `
@@ -4807,11 +5075,34 @@
                         ${baseAttrHtml}
                     </div>
                 </div>
-                ${buffsHtml}
+                ${tabsHtml}
             `;
-            detailsContent.querySelectorAll('.buff-item').forEach(element => {
+            detailsContent.querySelectorAll('[data-details-tab]').forEach(tabButton => {
+                tabButton.addEventListener('click', () => {
+                    const tabKey = tabButton.dataset.detailsTab;
+                    detailsContent.querySelectorAll('[data-details-tab]').forEach(button => {
+                        const isActive = button.dataset.detailsTab === tabKey;
+                        button.classList.toggle('active', isActive);
+                        button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    });
+                    detailsContent.querySelectorAll('[data-details-panel]').forEach(panel => {
+                        panel.classList.toggle('active', panel.dataset.detailsPanel === tabKey);
+                    });
+                });
+            });
+            detailsContent.querySelectorAll('.buff-item[data-buff-index]').forEach(element => {
                 element.addEventListener('click', () => {
                     highlightBuffSources(Number(element.dataset.buffIndex));
+                });
+            });
+            detailsContent.querySelectorAll('.area-land-add-item[data-land-source-id]').forEach(element => {
+                element.addEventListener('click', () => {
+                    const sourceId = Number(element.dataset.landSourceId);
+                    if (!Number.isFinite(sourceId)) return;
+                    if (!getPlacedById(sourceId)) return;
+                    ensureBuildingsVisible([sourceId]);
+                    flashBuildingFocus(sourceId);
+                    flashScopeEffectForBuilding(sourceId);
                 });
             });
             const colorButton = detailsContent.querySelector('.details-color-btn');
@@ -5306,6 +5597,8 @@
                 p.landBuff = 0;
                 p.commodityBuff = 0;
                 p.activeBuffs = [];
+                p.areaLandAddBuff = 0;
+                p.areaLandAddSources = [];
                 appliedBuffKeys.set(p.id, new Set());
             });
             // check each rule
@@ -5346,6 +5639,27 @@
                     }
                 }
             });
+
+            // apply scope-based land_add bonus (diamond/Manhattan distance), stackable
+            placed.forEach(sourceBuilding => {
+                const sourceData = getBuildDefinitionByName(sourceBuilding.name);
+                const scope = Number(sourceData?.scope);
+                const landAdd = Number(sourceData?.land_add);
+                if (!Number.isFinite(scope) || scope <= 0) return;
+                if (!Number.isFinite(landAdd) || landAdd === 0) return;
+
+                placed.forEach(targetBuilding => {
+                    if (targetBuilding.id === sourceBuilding.id) return;
+                    if (!isBuildingInDiamondScope(sourceBuilding, targetBuilding, scope)) return;
+                    targetBuilding.areaLandAddBuff += landAdd;
+                    targetBuilding.areaLandAddSources.push({
+                        sourceId: sourceBuilding.id,
+                        sourceName: sourceBuilding.name,
+                        landAdd,
+                        scope
+                    });
+                });
+            });
             updateLabels();
             if (selectedBuffIndex !== null) {
                 const selectedBuilding = getSelectedBuilding();
@@ -5356,6 +5670,7 @@
                 }
             }
             renderBuildingDetails(getSelectedBuilding());
+            renderSelectedScopeEffect();
         }
 
         function logBuildingBuffs(id) {
@@ -5446,6 +5761,47 @@
             const ax1=a.x, ay1=a.y, ax2=a.x+aw, ay2=a.y+ah;
             const bx1=b.x-dist, by1=b.y-dist, bx2=b.x+bw+dist, by2=b.y+bh+dist;
             return !(ax2<bx1||ax1>bx2||ay2<by1||ay1>by2);
+        }
+
+        function getBuildDefinitionByName(name) {
+            const normalizedName = normalizeBuildingName(name);
+            return buildData.find(item => normalizeBuildingName(item.name) === normalizedName) || null;
+        }
+
+        function getBuildingRotatedSize(building) {
+            return building.rot % 180 === 0
+                ? [building.w, building.h]
+                : [building.h, building.w];
+        }
+
+        function getFootprintBounds(building) {
+            const [width, height] = getBuildingRotatedSize(building);
+            return {
+                left: building.x,
+                top: building.y,
+                right: building.x + width - 1,
+                bottom: building.y + height - 1
+            };
+        }
+
+        function getManhattanDistanceBetweenFootprints(a, b) {
+            const aBounds = getFootprintBounds(a);
+            const bBounds = getFootprintBounds(b);
+
+            const horizontalGap = aBounds.right < bBounds.left
+                ? (bBounds.left - aBounds.right)
+                : (bBounds.right < aBounds.left ? (aBounds.left - bBounds.right) : 0);
+            const verticalGap = aBounds.bottom < bBounds.top
+                ? (bBounds.top - aBounds.bottom)
+                : (bBounds.bottom < aBounds.top ? (aBounds.top - bBounds.bottom) : 0);
+
+            // Manhattan distance between nearest footprint cells.
+            return horizontalGap + verticalGap;
+        }
+
+        function isBuildingInDiamondScope(sourceBuilding, targetBuilding, scope) {
+            const distance = getManhattanDistanceBetweenFootprints(sourceBuilding, targetBuilding);
+            return distance > 0 && distance <= scope;
         }
 
         function updateLabels() {
