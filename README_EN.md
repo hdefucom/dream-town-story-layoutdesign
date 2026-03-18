@@ -8,6 +8,7 @@ A layout planning tool for the mobile game Dream Town. It supports building plac
 >
 > Built with GitHub Copilot assistance.
 
+
 ## Quick Start
 
 Start a local HTTP server in the project root:
