@@ -790,7 +790,16 @@
             gap: 10px;
             margin-bottom: 8px;
         }
+        .details-card-title-group {
+            min-width: 0;
+        }
         .details-card-title { font-size: 15px; font-weight: bold; margin: 0; }
+        .details-card-subtitle {
+            font-size: 12px;
+            color: #6f665b;
+            line-height: 1.45;
+            margin-top: 2px;
+        }
         .details-title-actions {
             display: flex;
             align-items: center;
@@ -4972,8 +4981,12 @@
             const buildingSource = getBuildDefinitionByName(building.name);
             const sourceLand = Number(buildingSource?.land);
             const sourceCommodity = Number(buildingSource?.commodity);
+            const sourceLandAdd = Number(buildingSource?.land_add);
+            const sourceScope = Number(buildingSource?.scope);
             const hasLand = Number.isFinite(sourceLand);
             const hasCommodity = Number.isFinite(sourceCommodity);
+            const hasLandAdd = Number.isFinite(sourceLandAdd);
+            const hasScope = Number.isFinite(sourceScope) && sourceScope > 0;
             const areaLandAddBuff = Number(building.areaLandAddBuff) || 0;
             const landValue = hasLand ? ((sourceLand * building.landBuff / 100) + areaLandAddBuff) : null;
             const commodityValue = hasCommodity ? (sourceCommodity * building.commodityBuff / 100) : null;
@@ -5006,9 +5019,9 @@
 
             const detailsInfoHtml = `
                 <div class="details-main-col">
-                    <div class="details-meta">坐标：(${building.x}, ${building.y})</div>
-                    <div class="details-meta">尺寸：${building.w} x ${building.h}</div>
-                    <div class="details-meta">旋转：${building.rot}°</div>
+                    ${hasLand ? `<div class="details-meta">基础地价：${sourceLand}</div>` : ''}
+                    ${hasScope ? `<div class="details-meta">范围：${sourceScope}格${hasLandAdd ? `，+${sourceLandAdd}` : ''}</div>` : ''}
+                    ${!hasScope && hasLandAdd ? `<div class="details-meta">地价数值加成：${sourceLandAdd}</div>` : ''}
                     <div class="details-meta">Buff 数量：${building.activeBuffs.length}</div>
                     <div class="details-meta">总地价加成：+${building.landBuff}</div>
                     <div class="details-meta">总商品加成：+${building.commodityBuff}</div>
@@ -5064,7 +5077,10 @@
             detailsContent.innerHTML = `
                 <div class="details-card">
                     <div class="details-card-title-row">
-                        <div class="details-card-title">${building.name}</div>
+                        <div class="details-card-title-group">
+                            <div class="details-card-title">${building.name}</div>
+                            <div class="details-card-subtitle">坐标：(${building.x}, ${building.y})</div>
+                        </div>
                         <div class="details-title-actions">
                             <button class="details-color-btn" type="button" title="自定义背景颜色" style="--details-color-btn: ${getBuildingBaseColor(building)}"></button>
                             <input class="details-color-input" type="color" value="${colorToHex(getBuildingBaseColor(building))}" aria-label="选择建筑背景颜色">
