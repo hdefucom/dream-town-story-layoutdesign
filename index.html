@@ -1754,6 +1754,10 @@
             color: #167a3f;
             font-weight: 800 !important;
         }
+        .base-data-cell-disabled {
+            background: rgba(176, 176, 176, 0.18) !important;
+            color: #8a8a8a !important;
+        }
         .base-data-table-empty {
             padding: 14px 10px;
             font-size: 12px;
@@ -6173,7 +6177,10 @@
                             : '<button type="button" class="base-data-row-action-btn" disabled>查看</button>';
                         const lvupText = formatBaseDataValue(item.lv_up);
                         const lvupClass = getBaseDataCellClass(item.lv_up);
-                        const lvupClassAttr = lvupClass ? ` class="${lvupClass}"` : '';
+                        const lvupClasses = [];
+                        if (lvupClass) lvupClasses.push(lvupClass);
+                        if (item.notRoad === true) lvupClasses.push('base-data-cell-disabled');
+                        const lvupClassAttr = lvupClasses.length ? ` class="${lvupClasses.join(' ')}"` : '';
                         return `<tr>
                             <td>${escapeHtml(formatBaseDataValue(item.name))}</td>
                             <td>${escapeHtml(formatBaseDataValue(item.level))}</td>
@@ -6205,10 +6212,15 @@
                         formatBaseDataArea(item),
                         item.existsCount
                     ];
-                    const rowCells = rawCells.map(raw => {
+                    const rowCells = rawCells.map((raw, cellIndex) => {
                         const text = formatBaseDataValue(raw);
+                        const classes = [];
                         const className = getBaseDataCellClass(raw);
-                        const classAttr = className ? ` class="${className}"` : '';
+                        if (className) classes.push(className);
+                        if (item.notRoad === true && cellIndex >= 4 && cellIndex <= 14) {
+                            classes.push('base-data-cell-disabled');
+                        }
+                        const classAttr = classes.length ? ` class="${classes.join(' ')}"` : '';
                         return `<td${classAttr}>${escapeHtml(text)}</td>`;
                     });
                     const actionButton = item.existsCount > 0
