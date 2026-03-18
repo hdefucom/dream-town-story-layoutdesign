@@ -1040,6 +1040,15 @@
             justify-content: center;
             z-index: 10000;
         }
+        #occupationDataOverlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
         #buffDataTable {
             table-layout: auto;
             min-width: unset;
@@ -1138,6 +1147,104 @@
             box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2);
             padding: 16px;
             box-sizing: border-box;
+        }
+        #occupationDataDialog {
+            width: min(1280px, calc(100vw - 32px));
+            max-height: calc(100vh - 48px);
+            overflow: auto;
+            background: #fff;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2);
+            padding: 16px;
+            box-sizing: border-box;
+        }
+        #occupationDataTable {
+            table-layout: auto;
+            min-width: 560px;
+        }
+        #occupationDataTable thead {
+            display: none;
+        }
+        #occupationDataTable tbody td {
+            white-space: normal;
+            word-break: break-all;
+            text-align: left;
+            vertical-align: top;
+        }
+        #occupationDataTable thead th,
+        #occupationDataTable tbody td {
+            border-left: 2px solid rgba(122, 103, 74, 0.5);
+            border-right: 2px solid rgba(122, 103, 74, 0.5);
+        }
+        #occupationDataTable thead th,
+        #occupationDataTable tbody td {
+            background: rgba(240, 231, 216, 0.34);
+        }
+        .occupation-job-name {
+            display: block;
+            font-weight: 700;
+            color: #2f281f;
+            margin-bottom: 4px;
+        }
+        .occupation-job-salary,
+        .occupation-job-builds {
+            display: block;
+            color: #5b5248;
+            line-height: 1.45;
+        }
+        .occupation-job-salary {
+            margin-bottom: 4px;
+        }
+        .occupation-group-row td {
+            padding: 0;
+            border-bottom: 1px solid rgba(122, 103, 74, 0.2);
+            background: #e8edf2;
+        }
+        .occupation-group-row[data-level-index="0"] td {
+            background: #e8edf2;
+        }
+        .occupation-group-row[data-level-index="1"] td {
+            background: #efe6d6;
+        }
+        .occupation-group-row[data-level-index="2"] td {
+            background: #e5efe4;
+        }
+        .occupation-group-row[data-level-index="3"] td {
+            background: #e4ebf3;
+        }
+        .occupation-group-row[data-level-index="4"] td {
+            background: #eee4f3;
+        }
+        .occupation-group-row[data-level-index="5"] td {
+            background: #f2e5ea;
+        }
+        .occupation-group-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+            border: 0;
+            margin: 0;
+            padding: 6px 8px;
+            text-align: left;
+            color: #35485b;
+            background: transparent;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        .occupation-group-toggle:hover {
+            background: rgba(255, 255, 255, 0.45);
+        }
+        .occupation-group-toggle::before {
+            content: '▾';
+            font-size: 11px;
+            color: #4e6378;
+        }
+        .occupation-group-toggle[aria-expanded="false"]::before {
+            content: '▸';
         }
         .base-data-header {
             position: sticky;
@@ -1634,6 +1741,7 @@
             <div class="palette-items" id="baseDataList">
                 <button id="openBaseDataBtn" type="button" class="base-data-open-btn">建筑数据</button>
                 <button id="openBuffDataBtn" type="button" class="base-data-open-btn">专业街</button>
+                <button id="openOccupationDataBtn" type="button" class="base-data-open-btn">职业勋章</button>
             </div>
         </div>
         <h3>建筑列表</h3>
@@ -1870,10 +1978,42 @@
             </div>
         </div>
     </div>
+    <div id="occupationDataOverlay" role="dialog" aria-modal="true" aria-labelledby="occupationDataTitle">
+        <div id="occupationDataDialog">
+            <div class="base-data-header">
+                <div id="occupationDataTitle" class="base-data-title">职业勋章</div>
+                <button id="occupationDataCloseBtn" type="button">关闭</button>
+            </div>
+            <div id="occupationDataTotal" class="base-data-total">共 0 条</div>
+            <div class="base-data-search-bar">
+                <input id="occupationDataSearchInput" class="base-data-search-input" type="text" placeholder="搜索职业名称、建筑名称或工资" autocomplete="off" />
+            </div>
+            <div class="base-data-table-wrap">
+                <table class="base-data-table" id="occupationDataTable">
+                    <colgroup>
+                        <col style="width:140px" />
+                        <col style="width:140px" />
+                        <col style="width:140px" />
+                        <col style="width:140px" />
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>职业</th>
+                            <th>职业</th>
+                            <th>职业</th>
+                            <th>职业</th>
+                        </tr>
+                    </thead>
+                    <tbody id="occupationDataTableBody"></tbody>
+                </table>
+                <div id="occupationDataEmpty" class="base-data-table-empty" style="display:none;">暂无职业勋章数据。</div>
+            </div>
+        </div>
+    </div>
 
     <script>
         const cols = 200, rows = 200, cellSize = 40;
-        let buildData = [], buffData = [], layoutsData = [];
+        let buildData = [], buffData = [], occupationData = [], layoutsData = [];
         let mapColorData = null;
         let mapColorEnabled = false;
         let gridLineDarkMode = false;
@@ -1898,6 +2038,7 @@
         let statsVisible = false;
         let baseDataVisible = false;
         let buffDataVisible = false;
+        let occupationDataVisible = false;
         let buffDataSortState = { key: '', direction: 'asc' };
         let buffDataViewMode = 'rule';
         let buffDataSearchQuery = '';
@@ -1905,6 +2046,8 @@
         let baseDataSortState = { key: '', direction: 'asc' };
         let baseDataSearchQuery = '';
         let baseDataCollapsedTypes = new Set();
+        let occupationSearchQuery = '';
+        let occupationCollapsedLevels = new Set();
         let statsCollapsedGroups = new Set();
         let hoverClientX = null;
         let hoverClientY = null;
@@ -2003,6 +2146,7 @@
             document.getElementById('statsBtn').addEventListener('click', showStats);
             document.getElementById('openBaseDataBtn').addEventListener('click', showBaseData);
             document.getElementById('openBuffDataBtn').addEventListener('click', showBuffData);
+            document.getElementById('openOccupationDataBtn').addEventListener('click', showOccupationData);
             document.getElementById('buffDataViewToggleBtn').addEventListener('click', () => {
                 buffDataViewMode = buffDataViewMode === 'rule' ? 'building' : 'rule';
                 renderBuffDataTable();
@@ -2010,6 +2154,10 @@
             document.getElementById('buffDataSearchInput').addEventListener('input', (event) => {
                 buffDataSearchQuery = String(event.target.value || '');
                 renderBuffDataTable();
+            });
+            document.getElementById('occupationDataSearchInput').addEventListener('input', (event) => {
+                occupationSearchQuery = String(event.target.value || '');
+                renderOccupationDataTable();
             });
             document.getElementById('pathCreateRoadBtn').addEventListener('click', createRoadFromShortestPath);
             document.getElementById('paletteToggleBtn').addEventListener('click', () => togglePanel('palette'));
@@ -2024,6 +2172,7 @@
             document.getElementById('statsCloseBtn').addEventListener('click', closeStats);
             document.getElementById('baseDataCloseBtn').addEventListener('click', closeBaseData);
             document.getElementById('buffDataCloseBtn').addEventListener('click', closeBuffData);
+            document.getElementById('occupationDataCloseBtn').addEventListener('click', closeOccupationData);
             document.getElementById('statsOverlay').addEventListener('click', (event) => {
                 if (event.target === document.getElementById('statsOverlay')) {
                     closeStats();
@@ -2038,6 +2187,18 @@
                 if (event.target === document.getElementById('buffDataOverlay')) {
                     closeBuffData();
                 }
+            });
+            document.getElementById('occupationDataOverlay').addEventListener('click', (event) => {
+                if (event.target === document.getElementById('occupationDataOverlay')) {
+                    closeOccupationData();
+                }
+            });
+            document.getElementById('occupationDataTableBody').addEventListener('click', (event) => {
+                const toggleButton = event.target.closest('button[data-occupation-level-toggle]');
+                if (!toggleButton) return;
+                const level = String(toggleButton.dataset.occupationLevelToggle || '').trim();
+                if (!level) return;
+                toggleOccupationLevelGroup(level);
             });
             document.querySelector('#buffDataTable thead').addEventListener('click', (event) => {
                 const th = event.target.closest('th[data-buff-sort-key]');
@@ -3499,6 +3660,14 @@
                 // only load cache once buffer rules are available
                 loadCache();
             });
+            fetchJsonNoCache('metadata/occupation.json').then(data=>{
+                occupationData = Array.isArray(data) ? data : [];
+                if (occupationDataVisible) {
+                    renderOccupationDataTable();
+                }
+            }).catch(err => {
+                console.warn('load occupation data error', err);
+            });
             fetchJsonNoCache('layouts.json').then(data=>{
                 layoutsData = data;
                 populateLayouts();
@@ -4932,7 +5101,7 @@
                 return;
             }
 
-            if ((manualVisible || statsVisible || baseDataVisible || buffDataVisible) && e.key !== 'Escape') {
+            if ((manualVisible || statsVisible || baseDataVisible || buffDataVisible || occupationDataVisible) && e.key !== 'Escape') {
                 return;
             }
 
@@ -4945,6 +5114,10 @@
             }
 
             if (e.key === 'Escape') {
+                if (occupationDataVisible) {
+                    closeOccupationData();
+                    return;
+                }
                 if (buffDataVisible) {
                     closeBuffData();
                     return;
@@ -5474,6 +5647,7 @@
             closePanels();
             closeManual();
             closeStats();
+            closeOccupationData();
             const overlay = document.getElementById('baseDataOverlay');
             if (!overlay) return;
             renderBaseDataTable();
@@ -5486,6 +5660,126 @@
             if (!overlay) return;
             overlay.style.display = 'none';
             baseDataVisible = false;
+        }
+
+        function getOccupationRows() {
+            return occupationData.map(levelEntry => ({
+                level: String(levelEntry?.level ?? ''),
+                reward: String(levelEntry?.reward ?? ''),
+                list: (Array.isArray(levelEntry?.list) ? levelEntry.list : []).map(item => ({
+                    name: String(item?.name ?? ''),
+                    builds: Array.isArray(item?.builds) ? item.builds : [],
+                    start: item?.start ?? '',
+                    upAdd: item?.up_add ?? '',
+                    max: item?.max ?? '',
+                    formula: `${item?.start ?? ''}+${item?.up_add ?? ''}*9=${item?.max ?? ''}`
+                }))
+            }));
+        }
+
+        function toggleOccupationLevelGroup(level) {
+            if (occupationCollapsedLevels.has(level)) {
+                occupationCollapsedLevels.delete(level);
+            } else {
+                occupationCollapsedLevels.add(level);
+            }
+            renderOccupationDataTable();
+        }
+
+        function renderOccupationDataTable() {
+            const totalEl = document.getElementById('occupationDataTotal');
+            const tbody = document.getElementById('occupationDataTableBody');
+            const emptyEl = document.getElementById('occupationDataEmpty');
+            const searchInput = document.getElementById('occupationDataSearchInput');
+            if (!totalEl || !tbody || !emptyEl) return;
+
+            if (searchInput && searchInput.value !== occupationSearchQuery) {
+                searchInput.value = occupationSearchQuery;
+            }
+
+            const normalizedKeyword = normalizeBuildingName(occupationSearchQuery).toLocaleLowerCase('zh-Hans-CN');
+            const rows = getOccupationRows().map(group => ({
+                ...group,
+                list: normalizedKeyword
+                    ? group.list.filter(item => {
+                        const terms = [item.name, item.formula, ...item.builds];
+                        return terms.some(term => normalizeBuildingName(term).toLocaleLowerCase('zh-Hans-CN').includes(normalizedKeyword));
+                    })
+                    : group.list
+            })).filter(group => group.list.length > 0);
+            const totalCount = rows.reduce((sum, group) => sum + group.list.length, 0);
+            totalEl.textContent = normalizedKeyword
+                ? `匹配 ${totalCount} 条职业数据，分为 ${rows.length} 个等级`
+                : `共 ${totalCount} 条职业数据，分为 ${rows.length} 个等级`;
+            if (!rows.length) {
+                tbody.innerHTML = '';
+                emptyEl.textContent = normalizedKeyword ? '未找到匹配数据。' : '暂无职业勋章数据。';
+                emptyEl.style.display = 'block';
+                return;
+            }
+
+            emptyEl.style.display = 'none';
+            emptyEl.textContent = '暂无职业勋章数据。';
+            tbody.innerHTML = rows.map((group, groupIndex) => {
+                const collapsed = occupationCollapsedLevels.has(group.level);
+                const header = `<tr class="occupation-group-row" data-level-index="${groupIndex % 6}">
+                    <td colspan="4">
+                        <button
+                            type="button"
+                            class="occupation-group-toggle"
+                            data-occupation-level-toggle="${escapeHtml(group.level)}"
+                            aria-expanded="${collapsed ? 'false' : 'true'}"
+                        >
+                            <span>等级 ${escapeHtml(group.level)}</span>
+                            <span class="base-data-group-count">奖励：${escapeHtml(group.reward || '-')}</span>
+                            <span class="base-data-group-count">(${group.list.length})</span>
+                        </button>
+                    </td>
+                </tr>`;
+                if (collapsed) return header;
+                const detailRows = [];
+                for (let i = 0; i < group.list.length; i += 4) {
+                    const chunk = group.list.slice(i, i + 4);
+                    const cells = [];
+                    chunk.forEach(item => {
+                        const buildsText = item.builds.length
+                            ? item.builds.map(build => escapeHtml(String(build))).join('<br>')
+                            : '-';
+                        cells.push(`<td>
+                            <span class="occupation-job-name">${escapeHtml(item.name)}</span>
+                            <span class="occupation-job-salary">工资：${escapeHtml(item.formula)}</span>
+                            <span class="occupation-job-builds">${buildsText}</span>
+                        </td>`);
+                    });
+                    const remaining = 4 - chunk.length;
+                    for (let fillIndex = 0; fillIndex < remaining; fillIndex += 1) {
+                        cells.push('<td></td>');
+                    }
+                    detailRows.push(`<tr>${cells.join('')}</tr>`);
+                }
+                return `${header}${detailRows.join('')}`;
+            }).join('');
+        }
+
+        function showOccupationData() {
+            clearSameBuildingHighlight();
+            closePanels();
+            closeManual();
+            closeStats();
+            closeBaseData();
+            closeBuffData();
+            const overlay = document.getElementById('occupationDataOverlay');
+            if (!overlay) return;
+            renderOccupationDataTable();
+            overlay.style.display = 'flex';
+            occupationDataVisible = true;
+        }
+
+        function closeOccupationData() {
+            const overlay = document.getElementById('occupationDataOverlay');
+            if (!overlay) return;
+            overlay.style.display = 'none';
+            occupationDataVisible = false;
         }
 
         function getBuffRuleOccurrences(rule) {
@@ -5823,6 +6117,7 @@
             closeManual();
             closeStats();
             closeBaseData();
+            closeOccupationData();
             const overlay = document.getElementById('buffDataOverlay');
             if (!overlay) return;
             renderBuffDataTable();
