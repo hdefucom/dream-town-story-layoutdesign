@@ -2805,12 +2805,76 @@
         }
 
         function serializeRoadCells() {
-            return Array.from(roadCells)
-                .sort((a, b) => a - b)
-                .map(index => ({
-                    x: index % cols,
-                    y: Math.floor(index / cols)
-                }));
+            const sorted = Array.from(roadCells).sort((a, b) => a - b);
+            if (!sorted.length) return [];
+
+            let minX = cols;
+            let minY = rows;
+            let maxX = 0;
+            let maxY = 0;
+
+            sorted.forEach(index => {
+                const x = index % cols;
+                const y = Math.floor(index / cols);
+                if (x < minX) minX = x;
+                if (y < minY) minY = y;
+                if (x > maxX) maxX = x;
+                if (y > maxY) maxY = y;
+            });
+
+            const width = maxX - minX + 1;
+            const height = maxY - minY + 1;
+            const matrix = Array.from({ length: height }, () => Array(width).fill('0'));
+
+            sorted.forEach(index => {
+                const x = index % cols;
+                const y = Math.floor(index / cols);
+                matrix[y - minY][x - minX] = '1';
+            });
+
+            return {
+                format: 'matrix',
+                origin: { x: minX, y: minY },
+                size: { w: width, h: height },
+                rows: matrix.map(row => row.join(''))
+            };
+        }
+
+        function parseRoadMatrixEntries(payload) {
+            if (!payload || typeof payload !== 'object') return [];
+            if (String(payload.format || '').toLowerCase() !== 'matrix') return [];
+
+            const ox = Number(payload.origin?.x);
+            const oy = Number(payload.origin?.y);
+            const rowsData = Array.isArray(payload.rows) ? payload.rows : [];
+            const declaredW = Number(payload.size?.w);
+            const declaredH = Number(payload.size?.h);
+            if (!Number.isInteger(ox) || !Number.isInteger(oy) || ox < 0 || oy < 0 || !rowsData.length) {
+                return [];
+            }
+
+            const height = Number.isInteger(declaredH) && declaredH > 0 ? declaredH : rowsData.length;
+            const inferredWidth = String(rowsData[0] ?? '').length;
+            const width = Number.isInteger(declaredW) && declaredW > 0 ? declaredW : inferredWidth;
+            if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
+                return [];
+            }
+
+            const result = [];
+            for (let rowIndex = 0; rowIndex < Math.min(height, rowsData.length); rowIndex += 1) {
+                const rowRaw = rowsData[rowIndex];
+                const cells = Array.isArray(rowRaw)
+                    ? rowRaw.map(value => String(value ?? ''))
+                    : String(rowRaw ?? '').split('');
+                for (let colIndex = 0; colIndex < Math.min(width, cells.length); colIndex += 1) {
+                    if (cells[colIndex] !== '1') continue;
+                    const x = ox + colIndex;
+                    const y = oy + rowIndex;
+                    if (x < 0 || y < 0 || x >= cols || y >= rows) continue;
+                    result.push(getRoadCellIndex(x, y));
+                }
+            }
+            return result;
         }
 
         function parseRoadCellIndex(entry) {
@@ -2886,16 +2950,17 @@
         function replaceRoadCells(entries, options = {}) {
             const { redraw = true } = options;
             roadCells.clear();
-            if (Array.isArray(entries)) {
-                entries.forEach(entry => {
-                    const index = parseRoadCellIndex(entry);
-                    if (index === null) return;
-                    const x = index % cols;
-                    const y = Math.floor(index / cols);
-                    if (isCellCoveredByBuilding(x, y)) return;
-                    roadCells.add(index);
-                });
-            }
+            const candidateIndexes = Array.isArray(entries)
+                ? entries.map(parseRoadCellIndex).filter(index => index !== null)
+                : parseRoadMatrixEntries(entries);
+
+            candidateIndexes.forEach(index => {
+                const x = index % cols;
+                const y = Math.floor(index / cols);
+                if (isCellCoveredByBuilding(x, y)) return;
+                roadCells.add(index);
+            });
+
             if (redraw) {
                 applyMapColorOverlay();
             }
@@ -2903,8 +2968,14 @@
 
         function buildLayoutPayload() {
             return {
-                version: 2,
-                placed: placed.map(p => ({ name: p.name, x: p.x, y: p.y, w: p.w, h: p.h, rot: p.rot, customColor: p.customColor || null })),
+                version: 3,
+                placed: placed.map(p => {
+                    const item = { name: p.name, x: p.x, y: p.y, w: p.w, h: p.h, rot: p.rot };
+                    if (p.customColor) {
+                        item.customColor = p.customColor;
+                    }
+                    return item;
+                }),
                 roads: serializeRoadCells()
             };
         }
@@ -2918,7 +2989,7 @@
             }
             return {
                 placed: Array.isArray(payload.placed) ? payload.placed : [],
-                roads: Array.isArray(payload.roads) ? payload.roads : []
+                roads: payload.roads ?? payload.roadMatrix ?? []
             };
         }
 
