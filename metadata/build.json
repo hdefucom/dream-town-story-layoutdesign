@@ -160,5 +160,16 @@
 {"name":"高尔夫球场","w":6,"h":6,"type":"产业2","level":"B","p_fm":"++","p_zs":"+","d_wh":"文化","d_yl":"娱乐","tool":"犀牛","treasure_where":"奋勉912","lv_up":"老妇人"},
 {"name":"狩猎公园","w":6,"h":6,"type":"产业2","commodity":26,"level":"A","p_fm":"+","p_cn":"++","d_dk":"待客","d_yl":"娱乐","tool":"公共汽车","treasure_where":"才能 952","lv_up":"成年女性","land":301},
 {"name":"全年滑雪场","w":6,"h":6,"type":"产业2","level":"A","p_cn":"+","d_dk":"待客","d_wh":"文化","treasure_where":"魅力 852","lv_up":"老妇人"},
-{"name":"赛马场","w":6,"h":6,"type":"产业2","level":"A","p_fm":"+","p_zs":"++","d_dk":"待客","d_wh":"文化","tool":"威罗曼","treasure_where":"智商902","lv_up":"成年女性"}
+{"name":"赛马场","w":6,"h":6,"type":"产业2","level":"A","p_fm":"+","p_zs":"++","d_dk":"待客","d_wh":"文化","tool":"威罗曼","treasure_where":"智商902","lv_up":"成年女性"},
+{"name":"小屋","w":2,"h":2,"type":"住房","level":"F","comfortable":5,"land_add":1},
+{"name":"公寓","w":2,"h":2,"type":"住房","level":"E","comfortable":10,"land_add":2},
+{"name":"住房","w":2,"h":2,"type":"住房","level":"D","comfortable":22,"land_add":4},
+{"name":"公寓","w":2,"h":2,"type":"住房","level":"B","comfortable":48,"land_add":8},
+{"name":"豪华别墅","w":2,"h":2,"type":"住房","level":"A","comfortable":56,"land_add":16},
+{"name":"西式建筑","w":2,"h":2,"type":"住房","level":"A","comfortable":70,"land_add":20},
+{"name":"设计师住宅","w":2,"h":2,"type":"住房","level":"A","comfortable":70,"land_add":25},
+{"name":"灯笼屋","w":2,"h":2,"type":"住房","level":"S","comfortable":130,"land_add":24},
+{"name":"西式房屋","w":2,"h":2,"type":"住房","level":"S","comfortable":95,"land_add":35},
+{"name":"老式房屋","w":2,"h":2,"type":"住房","level":"S","comfortable":95,"land_add":36},
+{"name":"开罗之家","w":2,"h":2,"type":"住房","level":"S","comfortable":110,"land_add":40}
 ]
