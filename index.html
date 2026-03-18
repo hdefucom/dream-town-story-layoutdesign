@@ -1049,6 +1049,15 @@
             justify-content: center;
             z-index: 10000;
         }
+        #storeDataOverlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
         #buffDataTable {
             table-layout: auto;
             min-width: unset;
@@ -1159,6 +1168,17 @@
             padding: 16px;
             box-sizing: border-box;
         }
+        #storeDataDialog {
+            width: min(1013px, calc(100vw - 24px));
+            max-height: calc(100vh - 48px);
+            overflow: auto;
+            background: #fff;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2);
+            padding: 16px;
+            box-sizing: border-box;
+        }
         #occupationDataTable {
             table-layout: auto;
             min-width: 560px;
@@ -1195,6 +1215,137 @@
         }
         .occupation-job-salary {
             margin-bottom: 4px;
+        }
+        .store-data-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+            gap: 10px;
+            align-items: start;
+        }
+        .store-data-section + .store-data-section {
+            margin-top: 0;
+        }
+        .store-data-section-title {
+            margin: 0 0 8px;
+            font-weight: 700;
+            color: #7a654a;
+        }
+        #storeBoxTable,
+        #storeBuyTable {
+            table-layout: fixed;
+            min-width: 0;
+            width: 100%;
+        }
+        #storeBoxTable thead th,
+        #storeBoxTable tbody td,
+        #storeBuyTable thead th,
+        #storeBuyTable tbody td {
+            width: auto;
+            padding: 3px 4px;
+        }
+        #storeBoxTable tbody td:nth-child(2),
+        #storeBuyTable tbody td:nth-child(2) {
+            text-align: left;
+            white-space: normal;
+            word-break: break-all;
+        }
+        #storeBoxTable thead th:first-child,
+        #storeBoxTable tbody td:first-child,
+        #storeBuyTable thead th:first-child,
+        #storeBuyTable tbody td:first-child {
+            white-space: nowrap;
+            width: 30px;
+            min-width: 30px;
+            max-width: 30px;
+            padding-left: 2px;
+            padding-right: 2px;
+            text-align: center;
+            font-size: 11px;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+        @media (max-width: 980px) {
+            .store-data-grid {
+                grid-template-columns: 1fr;
+                gap: 18px;
+            }
+        }
+        .store-inline-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .store-box-lines {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .store-box-line {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            min-height: 24px;
+            padding: 2px 8px;
+            border-radius: 8px;
+            background: rgba(240, 231, 216, 0.46);
+            border: 1px solid rgba(122, 103, 74, 0.2);
+            font-size: 12px;
+            line-height: 1.45;
+            color: #4a4034;
+        }
+        .store-inline-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 24px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: rgba(240, 231, 216, 0.46);
+            border: 1px solid rgba(122, 103, 74, 0.2);
+            font-size: 12px;
+            line-height: 1.45;
+            color: #4a4034;
+        }
+        .store-inline-sep {
+            color: #9a8a76;
+        }
+        .store-box-ssr {
+            color: #cc2b2b;
+            font-weight: 700;
+        }
+        .store-box-meta {
+            font-weight: 600;
+            color: #5d5143;
+        }
+        .store-box-ssr::before {
+            content: '| ';
+            color: #9a8a76;
+            font-weight: 400;
+        }
+        .store-buy-item {
+            display: inline-flex;
+            align-items: center;
+            min-height: 24px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: rgba(228, 239, 227, 0.56);
+            border: 1px solid rgba(101, 132, 95, 0.2);
+            font-size: 12px;
+            line-height: 1.45;
+            color: #2f4c2f;
+        }
+        .store-box-empty-item,
+        .store-buy-empty-item {
+            display: inline-flex;
+            align-items: center;
+            min-height: 24px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: rgba(236, 236, 236, 0.65);
+            border: 1px solid rgba(150, 150, 150, 0.26);
+            font-size: 12px;
+            color: #7a7a7a;
         }
         .occupation-group-row td {
             padding: 0;
@@ -1742,6 +1893,7 @@
                 <button id="openBaseDataBtn" type="button" class="base-data-open-btn">建筑数据</button>
                 <button id="openBuffDataBtn" type="button" class="base-data-open-btn">专业街</button>
                 <button id="openOccupationDataBtn" type="button" class="base-data-open-btn">职业勋章</button>
+                <button id="openStoreDataBtn" type="button" class="base-data-open-btn">商店</button>
             </div>
         </div>
         <h3>建筑列表</h3>
@@ -2010,10 +2162,63 @@
             </div>
         </div>
     </div>
+    <div id="storeDataOverlay" role="dialog" aria-modal="true" aria-labelledby="storeDataTitle">
+        <div id="storeDataDialog">
+            <div class="base-data-header">
+                <div id="storeDataTitle" class="base-data-title">商店数据</div>
+                <button id="storeDataCloseBtn" type="button">关闭</button>
+            </div>
+            <div id="storeDataTotal" class="base-data-total">盒子 0 条，直购 0 条</div>
+            <div class="base-data-search-bar">
+                <input id="storeDataSearchInput" class="base-data-search-input" type="text" placeholder="搜索建筑名称（模糊匹配）" autocomplete="off" />
+            </div>
+            <div class="store-data-grid">
+                <div class="store-data-section">
+                    <div class="store-data-section-title">盒子</div>
+                    <div class="base-data-table-wrap">
+                        <table class="base-data-table" id="storeBoxTable">
+                            <colgroup>
+                                <col style="width:30px" />
+                                <col />
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th>日期</th>
+                                    <th>明细</th>
+                                </tr>
+                            </thead>
+                            <tbody id="storeBoxTableBody"></tbody>
+                        </table>
+                        <div id="storeBoxEmpty" class="base-data-table-empty" style="display:none;">暂无盒子数据。</div>
+                    </div>
+                </div>
+                <div class="store-data-section">
+                    <div class="store-data-section-title">直购</div>
+                    <div class="base-data-table-wrap">
+                        <table class="base-data-table" id="storeBuyTable">
+                            <colgroup>
+                                <col style="width:30px" />
+                                <col />
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th>日期</th>
+                                    <th>明细</th>
+                                </tr>
+                            </thead>
+                            <tbody id="storeBuyTableBody"></tbody>
+                        </table>
+                        <div id="storeBuyEmpty" class="base-data-table-empty" style="display:none;">暂无直购数据。</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         const cols = 200, rows = 200, cellSize = 40;
         let buildData = [], buffData = [], occupationData = [], layoutsData = [];
+        let storeData = { box: [], buy: [] };
         let mapColorData = null;
         let mapColorEnabled = false;
         let gridLineDarkMode = false;
@@ -2039,6 +2244,7 @@
         let baseDataVisible = false;
         let buffDataVisible = false;
         let occupationDataVisible = false;
+        let storeDataVisible = false;
         let buffDataSortState = { key: '', direction: 'asc' };
         let buffDataViewMode = 'rule';
         let buffDataSearchQuery = '';
@@ -2047,6 +2253,7 @@
         let baseDataSearchQuery = '';
         let baseDataCollapsedTypes = new Set();
         let occupationSearchQuery = '';
+        let storeSearchQuery = '';
         let occupationCollapsedLevels = new Set();
         let statsCollapsedGroups = new Set();
         let hoverClientX = null;
@@ -2147,6 +2354,7 @@
             document.getElementById('openBaseDataBtn').addEventListener('click', showBaseData);
             document.getElementById('openBuffDataBtn').addEventListener('click', showBuffData);
             document.getElementById('openOccupationDataBtn').addEventListener('click', showOccupationData);
+            document.getElementById('openStoreDataBtn').addEventListener('click', showStoreData);
             document.getElementById('buffDataViewToggleBtn').addEventListener('click', () => {
                 buffDataViewMode = buffDataViewMode === 'rule' ? 'building' : 'rule';
                 renderBuffDataTable();
@@ -2158,6 +2366,10 @@
             document.getElementById('occupationDataSearchInput').addEventListener('input', (event) => {
                 occupationSearchQuery = String(event.target.value || '');
                 renderOccupationDataTable();
+            });
+            document.getElementById('storeDataSearchInput').addEventListener('input', (event) => {
+                storeSearchQuery = String(event.target.value || '');
+                renderStoreDataTables();
             });
             document.getElementById('pathCreateRoadBtn').addEventListener('click', createRoadFromShortestPath);
             document.getElementById('paletteToggleBtn').addEventListener('click', () => togglePanel('palette'));
@@ -2173,6 +2385,7 @@
             document.getElementById('baseDataCloseBtn').addEventListener('click', closeBaseData);
             document.getElementById('buffDataCloseBtn').addEventListener('click', closeBuffData);
             document.getElementById('occupationDataCloseBtn').addEventListener('click', closeOccupationData);
+            document.getElementById('storeDataCloseBtn').addEventListener('click', closeStoreData);
             document.getElementById('statsOverlay').addEventListener('click', (event) => {
                 if (event.target === document.getElementById('statsOverlay')) {
                     closeStats();
@@ -2191,6 +2404,11 @@
             document.getElementById('occupationDataOverlay').addEventListener('click', (event) => {
                 if (event.target === document.getElementById('occupationDataOverlay')) {
                     closeOccupationData();
+                }
+            });
+            document.getElementById('storeDataOverlay').addEventListener('click', (event) => {
+                if (event.target === document.getElementById('storeDataOverlay')) {
+                    closeStoreData();
                 }
             });
             document.getElementById('occupationDataTableBody').addEventListener('click', (event) => {
@@ -3668,6 +3886,18 @@
             }).catch(err => {
                 console.warn('load occupation data error', err);
             });
+            fetchJsonNoCache('metadata/store.json').then(data=>{
+                const nextData = data && typeof data === 'object' ? data : {};
+                storeData = {
+                    box: Array.isArray(nextData.box) ? nextData.box : [],
+                    buy: Array.isArray(nextData.buy) ? nextData.buy : []
+                };
+                if (storeDataVisible) {
+                    renderStoreDataTables();
+                }
+            }).catch(err => {
+                console.warn('load store data error', err);
+            });
             fetchJsonNoCache('layouts.json').then(data=>{
                 layoutsData = data;
                 populateLayouts();
@@ -5101,7 +5331,7 @@
                 return;
             }
 
-            if ((manualVisible || statsVisible || baseDataVisible || buffDataVisible || occupationDataVisible) && e.key !== 'Escape') {
+            if ((manualVisible || statsVisible || baseDataVisible || buffDataVisible || occupationDataVisible || storeDataVisible) && e.key !== 'Escape') {
                 return;
             }
 
@@ -5114,6 +5344,10 @@
             }
 
             if (e.key === 'Escape') {
+                if (storeDataVisible) {
+                    closeStoreData();
+                    return;
+                }
                 if (occupationDataVisible) {
                     closeOccupationData();
                     return;
@@ -5648,6 +5882,7 @@
             closeManual();
             closeStats();
             closeOccupationData();
+            closeStoreData();
             const overlay = document.getElementById('baseDataOverlay');
             if (!overlay) return;
             renderBaseDataTable();
@@ -5768,6 +6003,7 @@
             closeStats();
             closeBaseData();
             closeBuffData();
+            closeStoreData();
             const overlay = document.getElementById('occupationDataOverlay');
             if (!overlay) return;
             renderOccupationDataTable();
@@ -5780,6 +6016,144 @@
             if (!overlay) return;
             overlay.style.display = 'none';
             occupationDataVisible = false;
+        }
+
+        function getStoreBoxRows() {
+            const boxGroups = Array.isArray(storeData?.box) ? storeData.box : [];
+            return boxGroups.map(group => {
+                const day = String(group?.day ?? '');
+                const list = Array.isArray(group?.list) ? group.list : [];
+                return {
+                    day,
+                    list: list.map(item => ({
+                        name: String(item?.name ?? ''),
+                        builds: Array.isArray(item?.builds) ? item.builds : [],
+                        resource: String(item?.resource ?? ''),
+                        ssr: String(item?.ssr ?? '')
+                    }))
+                };
+            });
+        }
+
+        function getStoreBuyRows() {
+            const buyRows = Array.isArray(storeData?.buy) ? storeData.buy : [];
+            return buyRows.map(item => ({
+                day: String(item?.day ?? ''),
+                builds: Array.isArray(item?.builds) ? item.builds : []
+            }));
+        }
+
+        function renderStoreDataTables() {
+            const totalEl = document.getElementById('storeDataTotal');
+            const boxBody = document.getElementById('storeBoxTableBody');
+            const buyBody = document.getElementById('storeBuyTableBody');
+            const boxEmpty = document.getElementById('storeBoxEmpty');
+            const buyEmpty = document.getElementById('storeBuyEmpty');
+            const searchInput = document.getElementById('storeDataSearchInput');
+            if (!totalEl || !boxBody || !buyBody || !boxEmpty || !buyEmpty) return;
+
+            if (searchInput && searchInput.value !== storeSearchQuery) {
+                searchInput.value = storeSearchQuery;
+            }
+
+            const normalizedKeyword = normalizeBuildingName(storeSearchQuery).toLocaleLowerCase('zh-Hans-CN');
+            const boxRows = getStoreBoxRows();
+            const buyRows = getStoreBuyRows();
+
+            const filteredBoxRows = boxRows.map(row => ({
+                ...row,
+                list: normalizedKeyword
+                    ? row.list.filter(detail => {
+                        const terms = [
+                            ...(Array.isArray(detail.builds) ? detail.builds : []),
+                            detail.ssr
+                        ];
+                        return terms.some(term => normalizeBuildingName(term).toLocaleLowerCase('zh-Hans-CN').includes(normalizedKeyword));
+                    })
+                    : row.list
+            })).filter(row => row.list.length > 0);
+
+            const filteredBuyRows = buyRows.map(row => ({
+                ...row,
+                builds: normalizedKeyword
+                    ? row.builds.filter(build => normalizeBuildingName(build).toLocaleLowerCase('zh-Hans-CN').includes(normalizedKeyword))
+                    : row.builds
+            })).filter(row => row.builds.length > 0);
+
+            const boxDetailCount = filteredBoxRows.reduce((sum, row) => sum + row.list.length, 0);
+            const buyDetailCount = filteredBuyRows.reduce((sum, row) => sum + row.builds.length, 0);
+            totalEl.textContent = normalizedKeyword
+                ? `匹配：盒子 ${filteredBoxRows.length} 组/${boxDetailCount} 条，直购 ${filteredBuyRows.length} 组/${buyDetailCount} 条`
+                : `盒子 ${filteredBoxRows.length} 组/${boxDetailCount} 条，直购 ${filteredBuyRows.length} 组/${buyDetailCount} 条`;
+
+            if (filteredBoxRows.length) {
+                boxBody.innerHTML = filteredBoxRows.map(item => `<tr>
+                    <td>${escapeHtml(item.day)}</td>
+                    <td>
+                        <div class="store-box-lines">
+                            ${item.list.length
+                                ? item.list.map(detail => {
+                                    const title = escapeHtml(detail.resource
+                                        ? `${detail.name} (${detail.resource})`
+                                        : detail.name);
+                                    const builds = detail.builds.length
+                                        ? detail.builds.map(build => `<span>${escapeHtml(String(build))}</span>`).join('<span class="store-inline-sep">/</span>')
+                                        : '<span class="store-box-empty-item">无建筑</span>';
+                                    const ssr = detail.ssr
+                                        ? `<span class="store-box-ssr">${escapeHtml(detail.ssr)}</span>`
+                                        : '';
+                                    return `<div class="store-box-line"><span class="store-box-meta">${title}</span><span class="store-inline-sep">:</span>${builds}${ssr}</div>`;
+                                }).join('')
+                                : '<span class="store-box-empty-item">暂无明细</span>'}
+                        </div>
+                    </td>
+                </tr>`).join('');
+                boxEmpty.style.display = 'none';
+            } else {
+                boxBody.innerHTML = '';
+                boxEmpty.textContent = normalizedKeyword ? '未找到匹配建筑。' : '暂无盒子数据。';
+                boxEmpty.style.display = 'block';
+            }
+
+            if (filteredBuyRows.length) {
+                buyBody.innerHTML = filteredBuyRows.map(item => `<tr>
+                    <td>${escapeHtml(item.day)}</td>
+                    <td>
+                        <div class="store-inline-list">
+                            ${item.builds.length
+                                ? item.builds.map(build => `<span class="store-buy-item">${escapeHtml(String(build))}</span>`).join('')
+                                : '<span class="store-buy-empty-item">暂无明细</span>'}
+                        </div>
+                    </td>
+                </tr>`).join('');
+                buyEmpty.style.display = 'none';
+            } else {
+                buyBody.innerHTML = '';
+                buyEmpty.textContent = normalizedKeyword ? '未找到匹配建筑。' : '暂无直购数据。';
+                buyEmpty.style.display = 'block';
+            }
+        }
+
+        function showStoreData() {
+            clearSameBuildingHighlight();
+            closePanels();
+            closeManual();
+            closeStats();
+            closeBaseData();
+            closeBuffData();
+            closeOccupationData();
+            const overlay = document.getElementById('storeDataOverlay');
+            if (!overlay) return;
+            renderStoreDataTables();
+            overlay.style.display = 'flex';
+            storeDataVisible = true;
+        }
+
+        function closeStoreData() {
+            const overlay = document.getElementById('storeDataOverlay');
+            if (!overlay) return;
+            overlay.style.display = 'none';
+            storeDataVisible = false;
         }
 
         function getBuffRuleOccurrences(rule) {
@@ -6118,6 +6492,7 @@
             closeStats();
             closeBaseData();
             closeOccupationData();
+            closeStoreData();
             const overlay = document.getElementById('buffDataOverlay');
             if (!overlay) return;
             renderBuffDataTable();
