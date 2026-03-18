@@ -3332,7 +3332,7 @@
 
         function buildLayoutPayload() {
             return {
-                version: 3,
+                version: 4,
                 placed: placed.map(p => {
                     const item = { name: p.name, x: p.x, y: p.y, w: p.w, h: p.h, rot: p.rot };
                     if (p.customColor) {
@@ -3340,20 +3340,25 @@
                     }
                     return item;
                 }),
-                roads: serializeRoadCells()
+                roads: serializeRoadCells(),
+                mapColorEnabled
             };
         }
 
         function normalizeLayoutPayload(payload) {
             if (Array.isArray(payload)) {
-                return { placed: payload, roads: [] };
+                return { placed: payload, roads: [], mapColorEnabled: null };
             }
             if (!payload || typeof payload !== 'object') {
-                return { placed: [], roads: [] };
+                return { placed: [], roads: [], mapColorEnabled: null };
             }
+            const savedMapColorEnabled = typeof payload.mapColorEnabled === 'boolean'
+                ? payload.mapColorEnabled
+                : null;
             return {
                 placed: Array.isArray(payload.placed) ? payload.placed : [],
-                roads: payload.roads ?? payload.roadMatrix ?? []
+                roads: payload.roads ?? payload.roadMatrix ?? [],
+                mapColorEnabled: savedMapColorEnabled
             };
         }
 
@@ -4497,6 +4502,11 @@
         async function loadPlacedItems(items, options = {}) {
             const { recordHistory = true, resetHistory = false } = options;
             const normalizedPayload = normalizeLayoutPayload(items);
+            if (typeof normalizedPayload.mapColorEnabled === 'boolean') {
+                mapColorEnabled = normalizedPayload.mapColorEnabled;
+                updateMapColorToggleUi();
+                saveUiPrefs();
+            }
             setPendingPlacement(null);
             resetPlacedBuildings();
             replaceRoadCells([], { redraw: false });
@@ -7687,8 +7697,7 @@
         }
         function exportLayout(){
             const payload = buildLayoutPayload();
-            const exportData = roadCells.size ? payload : payload.placed;
-            const blob=new Blob([JSON.stringify(exportData, null, 2)],{type:'application/json'});
+            const blob=new Blob([JSON.stringify(payload, null, 2)],{type:'application/json'});
             const url=URL.createObjectURL(blob);
             const d = new Date();
             const pad = (v) => String(v).padStart(2, '0');
