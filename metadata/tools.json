@@ -1,0 +1,292 @@
+{
+  "vehicles": [
+    {
+      "name": "自行车",
+      "build": "自行车店",
+      "effect": 2
+    },
+    {
+      "name": "一轮车",
+      "build": "学校",
+      "effect": 2
+    },
+    {
+      "name": "鸵鸟",
+      "build": "土产店",
+      "effect": 2
+    },
+    {
+      "name": "摩托车",
+      "build": "摩托店",
+      "effect": 4
+    },
+    {
+      "name": "平衡二轮",
+      "build": "警备公司",
+      "effect": 4
+    },
+    {
+      "name": "卡车",
+      "build": "演唱会场",
+      "effect": 5
+    },
+    {
+      "name": "牛",
+      "build": "牧场",
+      "effect": 5
+    },
+    {
+      "name": "歪罗超人",
+      "build": "赛马场",
+      "effect": 5
+    },
+    {
+      "name": "狮子",
+      "build": "喷泉广场",
+      "effect": 5
+    },
+    {
+      "name": "电动自行车",
+      "build": "披萨店",
+      "effect": 6
+    },
+    {
+      "name": "轻型卡车",
+      "build": "工务店",
+      "effect": 6
+    },
+    {
+      "name": "小汽车",
+      "build": "汽车经销商",
+      "effect": 8
+    },
+    {
+      "name": "巴士",
+      "build": "游乐园",
+      "effect": 8
+    },
+    {
+      "name": "气球",
+      "build": "高层大楼",
+      "effect": 8
+    },
+    {
+      "name": "飞碟",
+      "build": "农家",
+      "effect": 9
+    },
+    {
+      "name": "直升机",
+      "build": "直升机场",
+      "effect": 9
+    },
+    {
+      "name": "机器人",
+      "build": "电脑商店",
+      "effect": 10
+    },
+    {
+      "name": "航天飞机",
+      "build": "火箭会场",
+      "effect": 10
+    },
+    {
+      "name": "战斗机",
+      "build": "超高层大楼",
+      "effect": 10
+    },
+    {
+      "name": "小飞机",
+      "build": "赌场",
+      "effect": 10
+    },
+    {
+      "name": "敞篷车-桃",
+      "build": "诊所",
+      "effect": 10
+    },
+    {
+      "name": "飞行船",
+      "build": "城堡",
+      "effect": 11
+    },
+    {
+      "name": "跑车",
+      "build": "停车场",
+      "effect": 12
+    },
+    {
+      "name": "象",
+      "build": "动物园",
+      "effect": 12
+    },
+    {
+      "name": "开罗超人",
+      "build": "开罗像",
+      "effect": 12
+    },
+    {
+      "name": "云",
+      "build": "寺院",
+      "effect": 13
+    },
+    {
+      "name": "敞篷车-黑",
+      "build": "高尔夫练习场",
+      "effect": 13
+    },
+    {
+      "name": "喷气机",
+      "build": "国际机场",
+      "effect": 16
+    }
+  ],
+  "vehiclesCell": [
+    "开罗大楼",
+    "歪罗像",
+    "阿布法拉像",
+    "小孩长大"
+  ],
+  "pets": [
+    {
+      "name": "大象",
+      "build": "大佛",
+      "effect": "地价+30%"
+    },
+    {
+      "name": "熊猫",
+      "build": "温泉旅馆",
+      "effect": "地价+30%"
+    },
+    {
+      "name": "猫",
+      "build": "鱼屋",
+      "effect": "地价+20%"
+    },
+    {
+      "name": "鸡",
+      "build": "乐器店",
+      "effect": "地价+20%"
+    },
+    {
+      "name": "企鹅",
+      "build": "水族馆",
+      "effect": "地价+20%"
+    },
+    {
+      "name": "兔子",
+      "build": "俱乐部",
+      "effect": "心地+30%"
+    },
+    {
+      "name": "山羊",
+      "build": "美容室",
+      "effect": "心地+20%"
+    },
+    {
+      "name": "考拉",
+      "build": "私塾",
+      "effect": "心地+20%"
+    },
+    {
+      "name": "狗",
+      "build": "宠物店",
+      "effect": "移动+8格"
+    },
+    {
+      "name": "牛",
+      "build": "烤肉店",
+      "effect": "智商+10%"
+    },
+    {
+      "name": "鹰",
+      "build": "古城/棒球场",
+      "effect": "智商+10%"
+    },
+    {
+      "name": "火烈鸟",
+      "build": "三星旅馆",
+      "effect": "智商+10%"
+    },
+    {
+      "name": "鳄鱼",
+      "build": "野营地",
+      "effect": "勤勉+15%"
+    },
+    {
+      "name": "袋鼠",
+      "build": "体育馆",
+      "effect": "勤勉+10%"
+    },
+    {
+      "name": "羊驼",
+      "build": "百货公司",
+      "effect": "勤勉+10%"
+    },
+    {
+      "name": "河童",
+      "build": "神社",
+      "effect": "才能+15%"
+    },
+    {
+      "name": "长颈鹿",
+      "build": "三重塔",
+      "effect": "才能+10%"
+    },
+    {
+      "name": "鸭子",
+      "build": "海之家",
+      "effect": "才能+10%"
+    },
+    {
+      "name": "飞碟大使",
+      "build": "电波塔",
+      "effect": "魅力+15%"
+    },
+    {
+      "name": "章鱼",
+      "build": "居酒屋",
+      "effect": "魅力+15%"
+    },
+    {
+      "name": "开罗犬",
+      "build": "开罗大楼",
+      "effect": "体力+30%"
+    },
+    {
+      "name": "胖波波",
+      "build": "医院",
+      "effect": "体力+20%"
+    },
+    {
+      "name": "绵羊",
+      "build": "玩具店",
+      "effect": "勤勉+10%"
+    }
+  ],
+  "slots": [
+    {
+      "name": "歪罗像",
+      "effect": "+1"
+    },
+    {
+      "name": "阿布法拉像",
+      "effect": "+1"
+    },
+    {
+      "name": "小孩长大",
+      "effect": "+1"
+    }
+  ],
+  "study": [
+    "学校",
+    "书店",
+    "私塾",
+    "粗点心店",
+    "地域中心",
+    "博物馆",
+    "狗的雕像",
+    "长椅",
+    "大佛像"
+  ]
+}
