@@ -1111,6 +1111,23 @@
             font-size: 13px;
             margin-bottom: 8px;
         }
+        .base-data-search-bar {
+            margin-bottom: 10px;
+        }
+        .base-data-search-input {
+            width: 100%;
+            border: 1px solid rgba(122, 103, 74, 0.24);
+            border-radius: 8px;
+            padding: 7px 10px;
+            font-size: 13px;
+            color: #2f281f;
+            background: #fff;
+            outline: none;
+        }
+        .base-data-search-input:focus {
+            border-color: rgba(29, 107, 87, 0.5);
+            box-shadow: 0 0 0 2px rgba(29, 107, 87, 0.12);
+        }
         .base-data-table-wrap {
             border: 1px solid rgba(122, 103, 74, 0.16);
             border-radius: 8px;
@@ -1133,9 +1150,6 @@
         }
         .base-data-col-name {
             width: 128px;
-        }
-        .base-data-col-type {
-            width: 60px;
         }
         .base-data-col-treasure {
             width: 140px;
@@ -1195,27 +1209,27 @@
             width: 1%;
             text-align: center;
         }
-        .base-data-table thead th:nth-child(6),
-        .base-data-table tbody td:nth-child(6),
-        .base-data-table thead th:nth-child(10),
-        .base-data-table tbody td:nth-child(10) {
+        .base-data-table thead th:nth-child(5),
+        .base-data-table tbody td:nth-child(5),
+        .base-data-table thead th:nth-child(9),
+        .base-data-table tbody td:nth-child(9) {
             border-left: 2px solid rgba(122, 103, 74, 0.5);
         }
-        .base-data-table thead th:nth-child(9),
-        .base-data-table tbody td:nth-child(9),
-        .base-data-table thead th:nth-child(13),
-        .base-data-table tbody td:nth-child(13) {
+        .base-data-table thead th:nth-child(8),
+        .base-data-table tbody td:nth-child(8),
+        .base-data-table thead th:nth-child(12),
+        .base-data-table tbody td:nth-child(12) {
             border-right: 2px solid rgba(122, 103, 74, 0.5);
         }
-        .base-data-table thead th:nth-child(n+6):nth-child(-n+9),
-        .base-data-table thead th:nth-child(n+10):nth-child(-n+13) {
+        .base-data-table thead th:nth-child(n+5):nth-child(-n+8),
+        .base-data-table thead th:nth-child(n+9):nth-child(-n+12) {
             background: rgba(240, 231, 216, 0.34);
             padding: 2px 1px;
             overflow: hidden;
             text-overflow: clip;
         }
-        .base-data-table tbody td:nth-child(n+6):nth-child(-n+9),
-        .base-data-table tbody td:nth-child(n+10):nth-child(-n+13) {
+        .base-data-table tbody td:nth-child(n+5):nth-child(-n+8),
+        .base-data-table tbody td:nth-child(n+9):nth-child(-n+12) {
             background: rgba(240, 231, 216, 0.34);
             padding: 2px 1px;
             font-size: 11px;
@@ -1224,6 +1238,42 @@
         }
         .base-data-table tbody tr:nth-child(even) {
             background: #fcfaf6;
+        }
+        .base-data-group-row td {
+            padding: 0;
+            border-bottom: 1px solid rgba(122, 103, 74, 0.2);
+            background: #efe6d7;
+        }
+        .base-data-group-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+            border: 0;
+            margin: 0;
+            padding: 6px 8px;
+            text-align: left;
+            color: #4b4032;
+            background: transparent;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        .base-data-group-toggle:hover {
+            background: rgba(255, 255, 255, 0.38);
+        }
+        .base-data-group-toggle::before {
+            content: '▾';
+            font-size: 11px;
+            color: #6b5e4b;
+        }
+        .base-data-group-toggle[aria-expanded="false"]::before {
+            content: '▸';
+        }
+        .base-data-group-count {
+            color: #7a6d5b;
+            font-weight: 600;
         }
         .base-data-cell-neg {
             color: #b42318;
@@ -1622,11 +1672,13 @@
                 <button id="baseDataCloseBtn" type="button">关闭</button>
             </div>
             <div id="baseDataTotal" class="base-data-total">总建筑数：0</div>
+            <div class="base-data-search-bar">
+                <input id="baseDataSearchInput" class="base-data-search-input" type="text" placeholder="搜索建筑名称（模糊匹配）" autocomplete="off" />
+            </div>
             <div class="base-data-table-wrap">
                 <table class="base-data-table">
                     <colgroup>
                         <col class="base-data-col-name" />
-                        <col class="base-data-col-type" />
                         <col class="base-data-col-normal" />
                         <col class="base-data-col-normal" />
                         <col class="base-data-col-normal" />
@@ -1648,7 +1700,6 @@
                     <thead>
                         <tr>
                             <th data-sort-key="name">名称</th>
-                            <th data-sort-key="type">类型</th>
                             <th data-sort-key="level">LV</th>
                             <th data-sort-key="land_add">地价</th>
                             <th data-sort-key="comfortable">舒适</th>
@@ -1704,6 +1755,8 @@
         let buffDataVisible = false;
         let buffDataSortState = { key: '', direction: 'asc' };
         let baseDataSortState = { key: '', direction: 'asc' };
+        let baseDataSearchQuery = '';
+        let baseDataCollapsedTypes = new Set();
         let statsCollapsedGroups = new Set();
         let hoverClientX = null;
         let hoverClientY = null;
@@ -1881,7 +1934,18 @@
                 }
                 renderBaseDataTable();
             });
+            document.getElementById('baseDataSearchInput').addEventListener('input', (event) => {
+                baseDataSearchQuery = String(event.target.value || '');
+                renderBaseDataTable();
+            });
             document.getElementById('baseDataTableBody').addEventListener('click', (event) => {
+                const toggleButton = event.target.closest('button[data-base-group-toggle]');
+                if (toggleButton) {
+                    const group = String(toggleButton.dataset.baseGroupToggle || '').trim();
+                    if (!group) return;
+                    toggleBaseDataGroup(group);
+                    return;
+                }
                 const button = event.target.closest('button[data-base-row-index]');
                 if (!button) return;
                 const rowIndex = Number(button.dataset.baseRowIndex);
@@ -5084,6 +5148,7 @@
         function getSortedBaseDataRows() {
             const rows = getBaseDataRows();
             const key = String(baseDataSortState.key || '').trim();
+            if (key === 'type') return rows;
             if (!key) return rows;
 
             const direction = baseDataSortState.direction === 'desc' ? -1 : 1;
@@ -5105,55 +5170,123 @@
             });
         }
 
+        function getBaseDataRowType(item) {
+            const type = String(item?.type || '').trim();
+            return type || '其他';
+        }
+
+        function toggleBaseDataGroup(type) {
+            if (baseDataCollapsedTypes.has(type)) {
+                baseDataCollapsedTypes.delete(type);
+            } else {
+                baseDataCollapsedTypes.add(type);
+            }
+            renderBaseDataTable();
+        }
+
         function renderBaseDataTable() {
             const totalEl = document.getElementById('baseDataTotal');
             const tbody = document.getElementById('baseDataTableBody');
             const emptyEl = document.getElementById('baseDataEmpty');
+            const searchInput = document.getElementById('baseDataSearchInput');
             if (!totalEl || !tbody || !emptyEl) return;
+
+            if (searchInput && searchInput.value !== baseDataSearchQuery) {
+                searchInput.value = baseDataSearchQuery;
+            }
 
             totalEl.textContent = `总建筑数：${buildData.length}`;
 
             if (!buildData.length) {
                 tbody.innerHTML = '';
+                emptyEl.textContent = '暂无建筑基础数据。';
                 emptyEl.style.display = 'block';
                 updateBaseDataSortHeaderState();
                 return;
             }
 
-            emptyEl.style.display = 'none';
             const rows = getSortedBaseDataRows();
-            const rowsHtml = rows.map(item => {
-                const rawCells = [
-                    item.name,
-                    item.type,
-                    item.level,
-                    item.land_add,
-                    item.comfortable,
-                    item.p_fm,
-                    item.p_cn,
-                    item.p_zs,
-                    item.p_ml,
-                    item.d_sp,
-                    item.d_dk,
-                    item.d_yl,
-                    item.d_wh,
-                    item.tool,
-                    item.treasure_where,
-                    item.lv_up,
-                    formatBaseDataArea(item),
-                    item.existsCount
-                ];
-                const rowCells = rawCells.map(raw => {
-                    const text = formatBaseDataValue(raw);
-                    const className = getBaseDataCellClass(raw);
-                    const classAttr = className ? ` class="${className}"` : '';
-                    return `<td${classAttr}>${escapeHtml(text)}</td>`;
-                });
-                const actionButton = item.existsCount > 0
-                    ? `<button type="button" class="base-data-row-action-btn" data-base-row-index="${item.sourceIndex}">查看</button>`
-                    : '<button type="button" class="base-data-row-action-btn" disabled>查看</button>';
-                rowCells.push(`<td>${actionButton}</td>`);
-                return `<tr>${rowCells.join('')}</tr>`;
+            const normalizedKeyword = normalizeBuildingName(baseDataSearchQuery).toLocaleLowerCase('zh-Hans-CN');
+            const filteredRows = normalizedKeyword
+                ? rows.filter(item => normalizeBuildingName(item.name).toLocaleLowerCase('zh-Hans-CN').includes(normalizedKeyword))
+                : rows;
+
+            totalEl.textContent = normalizedKeyword
+                ? `总建筑数：${buildData.length}，匹配：${filteredRows.length}`
+                : `总建筑数：${buildData.length}`;
+
+            if (!filteredRows.length) {
+                tbody.innerHTML = '';
+                emptyEl.textContent = '未找到匹配建筑。';
+                emptyEl.style.display = 'block';
+                updateBaseDataSortHeaderState();
+                return;
+            }
+
+            emptyEl.textContent = '暂无建筑基础数据。';
+            emptyEl.style.display = 'none';
+            const rowsByType = new Map();
+            filteredRows.forEach(item => {
+                const type = getBaseDataRowType(item);
+                const list = rowsByType.get(type) || [];
+                list.push(item);
+                rowsByType.set(type, list);
+            });
+
+            const rowsHtml = [...rowsByType.entries()].map(([type, groupRows]) => {
+                const safeType = escapeHtml(type);
+                const collapsed = baseDataCollapsedTypes.has(type);
+                const headerRow = `
+                    <tr class="base-data-group-row">
+                        <td colspan="18">
+                            <button
+                                type="button"
+                                class="base-data-group-toggle"
+                                data-base-group-toggle="${safeType}"
+                                aria-expanded="${collapsed ? 'false' : 'true'}"
+                            >
+                                <span>${safeType}</span>
+                                <span class="base-data-group-count">(${groupRows.length})</span>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                if (collapsed) return headerRow;
+
+                const itemRows = groupRows.map(item => {
+                    const rawCells = [
+                        item.name,
+                        item.level,
+                        item.land_add,
+                        item.comfortable,
+                        item.p_fm,
+                        item.p_cn,
+                        item.p_zs,
+                        item.p_ml,
+                        item.d_sp,
+                        item.d_dk,
+                        item.d_yl,
+                        item.d_wh,
+                        item.tool,
+                        item.treasure_where,
+                        item.lv_up,
+                        formatBaseDataArea(item),
+                        item.existsCount
+                    ];
+                    const rowCells = rawCells.map(raw => {
+                        const text = formatBaseDataValue(raw);
+                        const className = getBaseDataCellClass(raw);
+                        const classAttr = className ? ` class="${className}"` : '';
+                        return `<td${classAttr}>${escapeHtml(text)}</td>`;
+                    });
+                    const actionButton = item.existsCount > 0
+                        ? `<button type="button" class="base-data-row-action-btn" data-base-row-index="${item.sourceIndex}">查看</button>`
+                        : '<button type="button" class="base-data-row-action-btn" disabled>查看</button>';
+                    rowCells.push(`<td>${actionButton}</td>`);
+                    return `<tr>${rowCells.join('')}</tr>`;
+                }).join('');
+
+                return `${headerRow}${itemRows}`;
             }).join('');
 
             tbody.innerHTML = rowsHtml;
