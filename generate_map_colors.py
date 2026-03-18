@@ -7,7 +7,7 @@ from pathlib import Path
 import png
 
 IMG_PATH = Path("map.png")
-OUT_PATH = Path("map_100x100_cells_colors.json")
+OUT_PATH = Path("metadata/map_100x100_cells_colors.json")
 COLS = 100
 ROWS = 100
 ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"

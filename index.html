@@ -3262,12 +3262,12 @@
         }
 
         function loadData() {
-            fetchJsonNoCache('build.json').then(data=>{
+            fetchJsonNoCache('metadata/build.json').then(data=>{
                 buildData = data;
                 populatePalette();
                 renderBuildingDetails(getSelectedBuilding());
             });
-            fetchJsonNoCache('buff.json').then(data=>{
+            fetchJsonNoCache('metadata/buff.json').then(data=>{
                 buffData = data;
                 // only load cache once buffer rules are available
                 loadCache();
@@ -3276,7 +3276,7 @@
                 layoutsData = data;
                 populateLayouts();
             });
-            fetchJsonNoCache('map_100x100_cells_colors.json').then(data => {
+            fetchJsonNoCache('metadata/map_100x100_cells_colors.json').then(data => {
                 mapColorData = data;
                 applyMapColorOverlay();
             }).catch(err => {
