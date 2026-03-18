@@ -73,7 +73,8 @@
             align-items: center;
             gap: 6px;
         }
-        .mobile-gitee-link {
+        .mobile-gitee-link,
+        .mobile-github-link {
             display: none;
             width: 34px;
             height: 34px;
@@ -85,11 +86,16 @@
             text-decoration: none;
             transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
         }
-        .mobile-gitee-link:hover {
+        .mobile-github-link {
+            color: #111;
+        }
+        .mobile-gitee-link:hover,
+        .mobile-github-link:hover {
             background: #fff;
             border-color: rgba(184, 48, 36, 0.35);
         }
-        .mobile-gitee-link img {
+        .mobile-gitee-link img,
+        .mobile-github-link svg {
             width: 22px;
             height: 22px;
             display: block;
@@ -145,7 +151,8 @@
             align-items: center;
             margin-bottom: 8px;
         }
-        .gitee-link {
+        .gitee-link,
+        .github-link {
             width: auto;
             height: auto;
             border: none;
@@ -156,11 +163,16 @@
             text-decoration: none;
             transition: transform 0.2s ease, filter 0.2s ease;
         }
-        .gitee-link:hover {
+        .github-link {
+            color: #111;
+        }
+        .gitee-link:hover,
+        .github-link:hover {
             transform: translateY(-1px);
             filter: drop-shadow(0 4px 10px rgba(120, 34, 34, 0.24));
         }
-        .gitee-link img {
+        .gitee-link img,
+        .github-link svg {
             width: 30px;
             height: auto;
             display: block;
@@ -1430,7 +1442,8 @@
             .palette-link-row {
                 display: none;
             }
-            .mobile-gitee-link {
+            .mobile-gitee-link,
+            .mobile-github-link {
                 display: inline-flex;
             }
             #palette,
@@ -1561,6 +1574,16 @@
         <div class="mobile-title">建筑布局设计工具</div>
         <div class="mobile-topbar-actions">
             <a
+                class="mobile-github-link"
+                href="https://github.com/hdefucom/dream-town-story-layoutdesign"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="打开 GitHub 仓库"
+                aria-label="打开 GitHub 仓库"
+            >
+                <svg aria-hidden="true" focusable="false" class="octicon octicon-mark-github" viewBox="0 0 24 24" width="32" height="32" fill="currentColor" display="inline-block" overflow="visible" style="vertical-align:text-bottom"><path d="M10.303 16.652c-2.837-.344-4.835-2.385-4.835-5.028 0-1.074.387-2.235 1.031-3.008-.279-.709-.236-2.214.086-2.837.86-.107 2.02.344 2.708.967.816-.258 1.676-.386 2.728-.386 1.053 0 1.913.128 2.686.365.666-.602 1.848-1.053 2.708-.946.3.581.344 2.085.064 2.815.688.817 1.053 1.913 1.053 3.03 0 2.643-1.998 4.641-4.877 5.006.73.473 1.224 1.504 1.224 2.686v2.235c0 .644.537 1.01 1.182.752 3.889-1.483 6.94-5.372 6.94-10.185 0-6.081-4.942-11.044-11.022-11.044-6.081 0-10.98 4.963-10.98 11.044a10.84 10.84 0 0 0 7.112 10.206c.58.215 1.139-.172 1.139-.752v-1.719a2.768 2.768 0 0 1-1.032.215c-1.418 0-2.256-.773-2.857-2.213-.237-.58-.495-.924-.989-.988-.258-.022-.344-.129-.344-.258 0-.258.43-.451.86-.451.623 0 1.16.386 1.719 1.181.43.623.881.903 1.418.903.537 0 .881-.194 1.375-.688.365-.365.645-.687.903-.902Z"></path></svg>
+            </a>
+            <a
                 class="mobile-gitee-link"
                 href="https://gitee.com/hdefucom/dream-town-story-layoutdesign"
                 target="_blank"
@@ -1580,6 +1603,16 @@
             <button id="paletteCloseBtn" class="panel-close-btn" type="button">关闭</button>
         </div>
         <div class="palette-link-row">
+            <a
+                class="github-link"
+                href="https://github.com/hdefucom/dream-town-story-layoutdesign"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="打开 GitHub 仓库"
+                aria-label="打开 GitHub 仓库"
+            >
+                <svg aria-hidden="true" focusable="false" class="octicon octicon-mark-github" viewBox="0 0 24 24" width="32" height="32" fill="currentColor" display="inline-block" overflow="visible" style="vertical-align:text-bottom"><path d="M10.303 16.652c-2.837-.344-4.835-2.385-4.835-5.028 0-1.074.387-2.235 1.031-3.008-.279-.709-.236-2.214.086-2.837.86-.107 2.02.344 2.708.967.816-.258 1.676-.386 2.728-.386 1.053 0 1.913.128 2.686.365.666-.602 1.848-1.053 2.708-.946.3.581.344 2.085.064 2.815.688.817 1.053 1.913 1.053 3.03 0 2.643-1.998 4.641-4.877 5.006.73.473 1.224 1.504 1.224 2.686v2.235c0 .644.537 1.01 1.182.752 3.889-1.483 6.94-5.372 6.94-10.185 0-6.081-4.942-11.044-11.022-11.044-6.081 0-10.98 4.963-10.98 11.044a10.84 10.84 0 0 0 7.112 10.206c.58.215 1.139-.172 1.139-.752v-1.719a2.768 2.768 0 0 1-1.032.215c-1.418 0-2.256-.773-2.857-2.213-.237-.58-.495-.924-.989-.988-.258-.022-.344-.129-.344-.258 0-.258.43-.451.86-.451.623 0 1.16.386 1.719 1.181.43.623.881.903 1.418.903.537 0 .881-.194 1.375-.688.365-.365.645-.687.903-.902Z"></path></svg>
+            </a>
             <a
                 class="gitee-link"
                 href="https://gitee.com/hdefucom/dream-town-story-layoutdesign"
