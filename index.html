@@ -6148,6 +6148,7 @@
             const rowsHtml = [...rowsByType.entries()].map(([type, groupRows]) => {
                 const safeType = escapeHtml(type);
                 const collapsed = baseDataCollapsedTypes.has(type);
+                const isHousingGroup = normalizeBuildingName(type) === normalizeBuildingName('住房');
                 const headerRow = `
                     <tr class="base-data-group-row">
                         <td colspan="18">
@@ -6166,6 +6167,25 @@
                 if (collapsed) return headerRow;
 
                 const itemRows = groupRows.map(item => {
+                    if (isHousingGroup) {
+                        const actionButton = item.existsCount > 0
+                            ? `<button type="button" class="base-data-row-action-btn" data-base-row-index="${item.sourceIndex}">查看</button>`
+                            : '<button type="button" class="base-data-row-action-btn" disabled>查看</button>';
+                        const lvupText = formatBaseDataValue(item.lv_up);
+                        const lvupClass = getBaseDataCellClass(item.lv_up);
+                        const lvupClassAttr = lvupClass ? ` class="${lvupClass}"` : '';
+                        return `<tr>
+                            <td>${escapeHtml(formatBaseDataValue(item.name))}</td>
+                            <td>${escapeHtml(formatBaseDataValue(item.level))}</td>
+                            <td>${escapeHtml(formatBaseDataValue(item.land_add))}</td>
+                            <td>${escapeHtml(formatBaseDataValue(item.comfortable))}</td>
+                            <td colspan="11"${lvupClassAttr}>${escapeHtml(lvupText)}</td>
+                            <td>${escapeHtml(formatBaseDataValue(formatBaseDataArea(item)))}</td>
+                            <td>${escapeHtml(formatBaseDataValue(item.existsCount))}</td>
+                            <td>${actionButton}</td>
+                        </tr>`;
+                    }
+
                     const rawCells = [
                         item.name,
                         item.level,
