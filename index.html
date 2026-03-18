@@ -1076,6 +1076,46 @@
             font-size: 12px;
             line-height: 1.2;
         }
+        #buffDataTable.buff-building-view thead th:nth-child(n+2):nth-child(-n+8),
+        #buffDataTable.buff-building-view tbody td:nth-child(n+2):nth-child(-n+8) {
+            background: transparent;
+        }
+        #buffDataTable.buff-building-view thead th:nth-child(n+3):nth-child(-n+5),
+        #buffDataTable.buff-building-view tbody td:nth-child(n+3):nth-child(-n+5) {
+            background: rgba(240, 231, 216, 0.34);
+        }
+        #buffDataTable.buff-building-view thead th:nth-child(n+6):nth-child(-n+7),
+        #buffDataTable.buff-building-view tbody td:nth-child(n+6):nth-child(-n+7) {
+            background: rgba(228, 239, 227, 0.52);
+        }
+        #buffDataTable.buff-building-view thead th:nth-child(2),
+        #buffDataTable.buff-building-view tbody td:nth-child(2),
+        #buffDataTable.buff-building-view thead th:nth-child(6),
+        #buffDataTable.buff-building-view tbody td:nth-child(6),
+        #buffDataTable.buff-building-view thead th:nth-child(8),
+        #buffDataTable.buff-building-view tbody td:nth-child(8) {
+            border-left: 0;
+        }
+        #buffDataTable.buff-building-view thead th:nth-child(3),
+        #buffDataTable.buff-building-view tbody td:nth-child(3),
+        #buffDataTable.buff-building-view thead th:nth-child(6),
+        #buffDataTable.buff-building-view tbody td:nth-child(6) {
+            border-left: 2px solid rgba(122, 103, 74, 0.5);
+        }
+        #buffDataTable.buff-building-view thead th:nth-child(4),
+        #buffDataTable.buff-building-view tbody td:nth-child(4),
+        #buffDataTable.buff-building-view thead th:nth-child(6),
+        #buffDataTable.buff-building-view tbody td:nth-child(6),
+        #buffDataTable.buff-building-view thead th:nth-child(8),
+        #buffDataTable.buff-building-view tbody td:nth-child(8) {
+            border-right: 0;
+        }
+        #buffDataTable.buff-building-view thead th:nth-child(5),
+        #buffDataTable.buff-building-view tbody td:nth-child(5),
+        #buffDataTable.buff-building-view thead th:nth-child(7),
+        #buffDataTable.buff-building-view tbody td:nth-child(7) {
+            border-right: 2px solid rgba(122, 103, 74, 0.5);
+        }
         #buffDataDialog {
             width: min(1280px, calc(100vw - 32px));
             max-height: calc(100vh - 48px);
@@ -1110,6 +1150,74 @@
             color: #5b5248;
             font-size: 13px;
             margin-bottom: 8px;
+        }
+        .buff-data-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .buff-data-search-input {
+            flex: 1;
+            min-width: 220px;
+            max-width: 520px;
+            border: 1px solid rgba(122, 103, 74, 0.24);
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 13px;
+            color: #2f281f;
+            background: #fff;
+            outline: none;
+        }
+        .buff-data-search-input:focus {
+            border-color: rgba(29, 107, 87, 0.5);
+            box-shadow: 0 0 0 2px rgba(29, 107, 87, 0.12);
+        }
+        .buff-data-view-toggle-btn {
+            border: 1px solid rgba(58, 87, 109, 0.2);
+            border-radius: 8px;
+            padding: 5px 10px;
+            font-size: 12px;
+            line-height: 1.2;
+            cursor: pointer;
+            background: #edf4f3;
+            color: var(--text);
+        }
+        .buff-data-view-toggle-btn:hover {
+            background: #dbeceb;
+        }
+        .buff-building-group-row td {
+            padding: 0;
+            border-bottom: 1px solid rgba(122, 103, 74, 0.2);
+            background: #e8edf2;
+        }
+        .buff-building-group-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+            border: 0;
+            margin: 0;
+            padding: 6px 8px;
+            text-align: left;
+            color: #35485b;
+            background: transparent;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        .buff-building-group-toggle:hover {
+            background: rgba(255, 255, 255, 0.45);
+        }
+        .buff-building-group-toggle::before {
+            content: '▾';
+            font-size: 11px;
+            color: #4e6378;
+        }
+        .buff-building-group-toggle[aria-expanded="false"]::before {
+            content: '▸';
         }
         .base-data-search-bar {
             margin-bottom: 10px;
@@ -1635,6 +1743,10 @@
                 <button id="buffDataCloseBtn" type="button">关闭</button>
             </div>
             <div id="buffDataTotal" class="base-data-total">共 0 条</div>
+            <div class="buff-data-toolbar">
+                <input id="buffDataSearchInput" class="buff-data-search-input" type="text" placeholder="搜索专业街名称或建筑名称" autocomplete="off" />
+                <button id="buffDataViewToggleBtn" type="button" class="buff-data-view-toggle-btn">切换：按建筑视图</button>
+            </div>
             <div class="base-data-table-wrap">
                 <table class="base-data-table" id="buffDataTable">
                     <colgroup>
@@ -1754,6 +1866,9 @@
         let baseDataVisible = false;
         let buffDataVisible = false;
         let buffDataSortState = { key: '', direction: 'asc' };
+        let buffDataViewMode = 'rule';
+        let buffDataSearchQuery = '';
+        let buffDataCollapsedBuildings = new Set();
         let baseDataSortState = { key: '', direction: 'asc' };
         let baseDataSearchQuery = '';
         let baseDataCollapsedTypes = new Set();
@@ -1855,6 +1970,14 @@
             document.getElementById('statsBtn').addEventListener('click', showStats);
             document.getElementById('openBaseDataBtn').addEventListener('click', showBaseData);
             document.getElementById('openBuffDataBtn').addEventListener('click', showBuffData);
+            document.getElementById('buffDataViewToggleBtn').addEventListener('click', () => {
+                buffDataViewMode = buffDataViewMode === 'rule' ? 'building' : 'rule';
+                renderBuffDataTable();
+            });
+            document.getElementById('buffDataSearchInput').addEventListener('input', (event) => {
+                buffDataSearchQuery = String(event.target.value || '');
+                renderBuffDataTable();
+            });
             document.getElementById('pathCreateRoadBtn').addEventListener('click', createRoadFromShortestPath);
             document.getElementById('paletteToggleBtn').addEventListener('click', () => togglePanel('palette'));
             document.getElementById('detailsToggleBtn').addEventListener('click', () => togglePanel('details'));
@@ -1909,6 +2032,13 @@
                 highlightBuffRuleSources(buffData[ruleIndex]);
             });
             document.getElementById('buffDataTableBody').addEventListener('click', (event) => {
+                const groupToggle = event.target.closest('button[data-buff-building-toggle]');
+                if (groupToggle) {
+                    const buildingName = String(groupToggle.dataset.buffBuildingToggle || '').trim();
+                    if (!buildingName) return;
+                    toggleBuffDataBuildingGroup(buildingName);
+                    return;
+                }
                 const button = event.target.closest('button[data-buff-rule-index]');
                 if (!button) return;
                 const ruleIndex = Number(button.dataset.buffRuleIndex);
@@ -5407,20 +5537,216 @@
             });
         }
 
+        function updateBuffDataViewToggleState() {
+            const button = document.getElementById('buffDataViewToggleBtn');
+            if (!button) return;
+            button.textContent = buffDataViewMode === 'rule'
+                ? '切换：按建筑视图'
+                : '切换：按专业街视图';
+        }
+
+        function toggleBuffDataBuildingGroup(buildingName) {
+            const key = normalizeBuildingName(buildingName);
+            if (!key) return;
+            if (buffDataCollapsedBuildings.has(key)) {
+                buffDataCollapsedBuildings.delete(key);
+            } else {
+                buffDataCollapsedBuildings.add(key);
+            }
+            renderBuffDataTable();
+        }
+
+        function matchesBuffSearchKeyword(rule, normalizedKeyword, extraTerms = []) {
+            if (!normalizedKeyword) return true;
+            const terms = [
+                rule?.name,
+                ...(Array.isArray(rule?.builds) ? rule.builds : [rule?.builds]),
+                ...extraTerms
+            ];
+            return terms.some(term => normalizeBuildingName(term).toLocaleLowerCase('zh-Hans-CN').includes(normalizedKeyword));
+        }
+
+        function getBuffDataByBuildingRows(normalizedKeyword = '') {
+            const rows = getBuffDataRows();
+            const orderedBuildings = [];
+            const seen = new Set();
+
+            buildData.forEach(item => {
+                const normalizedName = normalizeBuildingName(item?.name);
+                if (!normalizedName || seen.has(normalizedName)) return;
+                seen.add(normalizedName);
+                orderedBuildings.push(String(item.name || ''));
+            });
+
+            const groupedRows = [];
+
+            orderedBuildings.forEach(buildingName => {
+                const normalizedBuildingName = normalizeBuildingName(buildingName);
+                const matchedRules = rows.filter(rule => {
+                    const builds = Array.isArray(rule.builds) ? rule.builds : [rule.builds ?? ''];
+                    return builds.some(name => normalizeBuildingName(name) === normalizedBuildingName);
+                });
+
+                const filteredRules = normalizedKeyword
+                    ? (normalizeBuildingName(buildingName).toLocaleLowerCase('zh-Hans-CN').includes(normalizedKeyword)
+                        ? matchedRules
+                        : matchedRules.filter(rule => matchesBuffSearchKeyword(rule, normalizedKeyword, [buildingName])))
+                    : matchedRules;
+
+                if (!filteredRules.length) return;
+
+                const detailRows = filteredRules.map(rule => {
+                    const builds = Array.isArray(rule.builds) ? rule.builds : [rule.builds ?? ''];
+                    const [build1 = '', build2 = '', build3 = ''] = builds;
+                    return {
+                        ruleIndex: rule.ruleIndex,
+                        streetName: String(rule.name || ''),
+                        build1: String(build1 || ''),
+                        build2: String(build2 || ''),
+                        build3: String(build3 || ''),
+                        land: rule.land !== undefined && rule.land !== null ? String(rule.land) : '',
+                        commodity: rule.commodity !== undefined && rule.commodity !== null ? String(rule.commodity) : '',
+                        existsCount: Number(rule.existsCount || 0)
+                    };
+                });
+
+                groupedRows.push({
+                    buildingName,
+                    key: normalizedBuildingName,
+                    details: detailRows
+                });
+            });
+
+            return groupedRows;
+        }
+
         function renderBuffDataTable() {
             const totalEl = document.getElementById('buffDataTotal');
             const tbody = document.getElementById('buffDataTableBody');
             const emptyEl = document.getElementById('buffDataEmpty');
+            const headerRow = document.querySelector('#buffDataTable thead tr');
+            const table = document.getElementById('buffDataTable');
+            const searchInput = document.getElementById('buffDataSearchInput');
             if (!totalEl || !tbody || !emptyEl) return;
+
+            if (searchInput && searchInput.value !== buffDataSearchQuery) {
+                searchInput.value = buffDataSearchQuery;
+            }
+            const normalizedKeyword = normalizeBuildingName(buffDataSearchQuery).toLocaleLowerCase('zh-Hans-CN');
+
+            updateBuffDataViewToggleState();
+
+            if (buffDataViewMode === 'building') {
+                if (table) table.classList.add('buff-building-view');
+                const groups = getBuffDataByBuildingRows(normalizedKeyword);
+                if (headerRow) {
+                    headerRow.innerHTML = `
+                        <th>建筑</th>
+                        <th>专业街</th>
+                        <th>建筑1</th>
+                        <th>建筑2</th>
+                        <th>建筑3</th>
+                        <th>地价加成</th>
+                        <th>商品价格加成</th>
+                        <th>地图触发数</th>
+                        <th>查看</th>
+                    `;
+                }
+
+                const detailCount = groups.reduce((sum, group) => sum + group.details.length, 0);
+                totalEl.textContent = `共 ${detailCount} 条明细，覆盖 ${groups.length} 个建筑`;
+                if (!groups.length) {
+                    tbody.innerHTML = '';
+                    emptyEl.textContent = normalizedKeyword ? '未找到匹配数据。' : '暂无可组成专业街的建筑。';
+                    emptyEl.style.display = 'block';
+                    return;
+                }
+
+                emptyEl.style.display = 'none';
+                emptyEl.textContent = '暂无数据。';
+                tbody.innerHTML = groups.map(group => {
+                    const safeName = escapeHtml(group.buildingName);
+                    const collapsed = buffDataCollapsedBuildings.has(group.key);
+                    const groupHeader = `<tr class="buff-building-group-row">
+                        <td colspan="9">
+                            <button
+                                type="button"
+                                class="buff-building-group-toggle"
+                                data-buff-building-toggle="${safeName}"
+                                aria-expanded="${collapsed ? 'false' : 'true'}"
+                            >
+                                <span>${safeName}</span>
+                                <span class="base-data-group-count">(${group.details.length})</span>
+                            </button>
+                        </td>
+                    </tr>`;
+
+                    if (collapsed) return groupHeader;
+
+                    const detailRows = group.details.map(item => {
+                        const actionButton = item.existsCount > 0
+                            ? `<button type="button" class="buff-data-view-btn" data-buff-rule-index="${item.ruleIndex}">查看</button>`
+                            : '<button type="button" class="buff-data-view-btn" disabled>查看</button>';
+                        const rowTitle = item.existsCount > 0 ? '点击高亮地图中的触发建筑' : '当前地图中不存在该专业街';
+                        return `<tr data-buff-rule-index="${item.ruleIndex}" title="${escapeHtml(rowTitle)}">
+                        <td>${safeName}</td>
+                        <td>${escapeHtml(item.streetName)}</td>
+                        <td>${escapeHtml(item.build1)}</td>
+                        <td>${escapeHtml(item.build2)}</td>
+                        <td>${escapeHtml(item.build3)}</td>
+                        <td>${escapeHtml(item.land)}</td>
+                        <td>${escapeHtml(item.commodity)}</td>
+                        <td>${escapeHtml(String(item.existsCount))}</td>
+                        <td>${actionButton}</td>
+                    </tr>`;
+                    }).join('');
+
+                    return `${groupHeader}${detailRows}`;
+                }).join('');
+                return;
+            }
+
+            if (table) table.classList.remove('buff-building-view');
+
+            if (headerRow) {
+                headerRow.innerHTML = `
+                    <th data-buff-sort-key="name">专业街</th>
+                    <th data-buff-sort-key="builds">建筑1</th>
+                    <th>建筑2</th>
+                    <th>建筑3</th>
+                    <th data-buff-sort-key="land">地价加成</th>
+                    <th data-buff-sort-key="commodity">商品价格加成</th>
+                    <th data-buff-sort-key="existsCount">存在数量</th>
+                    <th>查看</th>
+                `;
+            }
+
             totalEl.textContent = `共 ${buffData.length} 条`;
             if (!buffData.length) {
                 tbody.innerHTML = '';
+                emptyEl.textContent = '暂无数据。';
                 emptyEl.style.display = 'block';
                 updateBuffDataSortHeaderState();
                 return;
             }
             emptyEl.style.display = 'none';
-            const rows = getSortedBuffDataRows();
+            const sortedRows = getSortedBuffDataRows();
+            const rows = normalizedKeyword
+                ? sortedRows.filter(rule => matchesBuffSearchKeyword(rule, normalizedKeyword))
+                : sortedRows;
+
+            if (normalizedKeyword) {
+                totalEl.textContent = `共 ${buffData.length} 条，匹配 ${rows.length} 条`;
+            }
+
+            if (!rows.length) {
+                tbody.innerHTML = '';
+                emptyEl.textContent = '未找到匹配数据。';
+                emptyEl.style.display = 'block';
+                updateBuffDataSortHeaderState();
+                return;
+            }
+
             tbody.innerHTML = rows.map(item => {
                 const builds = Array.isArray(item.builds) ? item.builds : [item.builds ?? ''];
                 const [build1 = '', build2 = '', build3 = ''] = builds;
